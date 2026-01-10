@@ -923,7 +923,7 @@ Ví dụ:
 
         <div class="prompt-section">
           <h3>🤖 Chưa có JSON? Dùng AI để tạo!</h3>
-          <p>Copy prompt bên dưới và dán vào ChatGPT, Claude, Gemini... cùng với ảnh chụp đề thi để tạo quiz JSON:</p>
+          <p>Copy prompt bên dưới và dán vào AI Studio, Nhớ chọn model Gemini 3 Pro và kéo thanh Temperature xuống thấp nhất</p>
           
           <div class="prompt-tabs">
             <button class="prompt-tab active" onclick="switchPromptTab('tracnghiem')">📝 Trắc Nghiệm</button>
@@ -931,7 +931,7 @@ Ví dụ:
           </div>
 
           <div class="prompt-content active" id="promptTracNghiem">
-            <div class="prompt-box" id="promptBox">OCR chính xác text lẫn đáp án (đáp án được in đậm), viết nó thành dạng json với định dạng:
+            <div class="prompt-box" id="promptBox">OCR chính xác text lẫn đáp án (đáp án được in đậm, bôi màu,...), viết nó thành dạng json với định dạng:
 {
   "type": "multiple_choice",
   "topic": "TÊN CHỦ ĐỀ",
@@ -950,7 +950,7 @@ Ví dụ:
   ]
 }
 
-Đảm bảo chính xác từng chữ lẫn đáp án, không cắt bỏt, không làm ngắn, làm hết tất cả câu hỏi.
+Đảm bảo chính xác từng chữ lẫn đáp án, không cắt bỏ, không làm ngắn, làm hết tất cả câu hỏi 1 cách chính xác.
 Nếu có lỗi chính tả hoặc in hoa sai thì sửa nó.
 ID câu hỏi theo dạng: CD{số chủ đề}_{số câu}</div>
             <button class="copy-prompt-btn" onclick="copyPrompt('tracnghiem')">
@@ -959,7 +959,7 @@ ID câu hỏi theo dạng: CD{số chủ đề}_{số câu}</div>
           </div>
 
           <div class="prompt-content" id="promptTuLuan">
-            <div class="prompt-box" id="promptBoxEssay">OCR chính xác câu hỏi tự luận từ ảnh, viết nó thành dạng JSON với định dạng:
+            <div class="prompt-box" id="promptBoxEssay">OCR chính xác câu hỏi tự luận từ ảnh, không được tự ý cắt ngắn, viết nó thành dạng JSON với định dạng:
 {
   "type": "essay",
   "topic": "TÊN CHỦ ĐỀ",
