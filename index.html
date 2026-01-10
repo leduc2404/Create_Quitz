@@ -1263,25 +1263,35 @@ Quy tắc:
         let mainTopic = fileName.replace(".json", "");
         let quizType = 'multiple_choice'; // Default type
 
-        // Detect quiz type from data
-        if (data.type === 'essay' || (Array.isArray(data) && data[0] && !data[0].options)) {
+        // Detect quiz type from explicit type field
+        if (data.type === 'essay') {
           quizType = 'essay';
-        } else if (data.type) {
-          quizType = data.type;
+        } else if (data.type === 'multiple_choice') {
+          quizType = 'multiple_choice';
         }
 
-        // Case 1: Array of questions directly (common for essay)
+        // Case 1: Array of items (topics with questions OR direct questions)
         if (Array.isArray(data)) {
-          // Check if it's array of essay questions
-          const isEssay = data[0] && !data[0].options && data[0].answer && typeof data[0].answer === 'string' && data[0].answer.includes('-');
-          if (isEssay) {
-            quizType = 'essay';
+          // Check first item to determine structure
+          const firstItem = data[0];
+          
+          if (firstItem && firstItem.questions && Array.isArray(firstItem.questions)) {
+            // Array of topics with questions - check first question in first topic
+            const firstQuestion = firstItem.questions[0];
+            if (firstQuestion) {
+              quizType = (firstQuestion.options && firstQuestion.options.length > 0) ? 'multiple_choice' : 'essay';
+            }
+          } else if (firstItem && firstItem.question) {
+            // Direct array of questions - check for options
+            quizType = (firstItem.options && firstItem.options.length > 0) ? 'multiple_choice' : 'essay';
           }
           
           data.forEach((item, index) => {
             if (item.questions && Array.isArray(item.questions)) {
               const topicName = item.topic || `Phần ${index + 1}`;
-              const itemType = item.type || quizType;
+              // Detect type from first question in this topic
+              const firstQ = item.questions[0];
+              const itemType = item.type || ((firstQ && firstQ.options && firstQ.options.length > 0) ? 'multiple_choice' : 'essay');
               topics.push({
                 topic: topicName,
                 questions: normalizeQuestions(item.questions, topicName, itemType)
@@ -1289,7 +1299,7 @@ Quy tắc:
               questions.push(...normalizeQuestions(item.questions, topicName, itemType));
             } else if (item.question) {
               // Single question (essay or multiple choice)
-              const itemType = item.options ? 'multiple_choice' : 'essay';
+              const itemType = (item.options && item.options.length > 0) ? 'multiple_choice' : 'essay';
               questions.push(normalizeQuestion(item, item.topic || mainTopic, index, itemType));
             }
           });
