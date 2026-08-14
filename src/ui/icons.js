@@ -1,0 +1,127 @@
+// Icon outline (Lucide) — serialize IconNode thành SVG string, không emoji.
+import {
+  Home,
+  Library,
+  SquarePlus,
+  User,
+  Play,
+  Share2,
+  PenLine,
+  Download,
+  Trash2,
+  MoreHorizontal,
+  ListChecks,
+  Star,
+  RotateCw,
+  X,
+  Timer,
+  CircleCheck,
+  TriangleAlert,
+  Info,
+  Sun,
+  Moon,
+  Sparkles,
+  BookOpen,
+  FlaskConical,
+  Calculator,
+  Languages,
+  Globe,
+  Music,
+  Code,
+  HeartPulse,
+  GraduationCap,
+  History,
+  Brain,
+  Upload,
+  WandSparkles,
+  LogOut,
+  ChevronRight,
+  CircleX,
+  Award,
+  TrendingUp,
+  Cloud,
+  CloudUpload,
+  Bookmark,
+  Zap,
+  FolderOpen,
+  ClipboardPaste,
+  Smartphone,
+  Flame,
+  Target,
+  CalendarDays
+} from "lucide";
+export const ICONS = {
+  Home,
+  Library,
+  SquarePlus,
+  User,
+  Play,
+  Share2,
+  PenLine,
+  Download,
+  Trash2,
+  MoreHorizontal,
+  ListChecks,
+  Star,
+  RotateCw,
+  X,
+  Timer,
+  CircleCheck,
+  TriangleAlert,
+  Info,
+  Sun,
+  Moon,
+  Sparkles,
+  BookOpen,
+  FlaskConical,
+  Calculator,
+  Languages,
+  Globe,
+  Music,
+  Code,
+  HeartPulse,
+  GraduationCap,
+  History,
+  Brain,
+  Upload,
+  WandSparkles,
+  LogOut,
+  ChevronRight,
+  CircleX,
+  Award,
+  TrendingUp,
+  Cloud,
+  CloudUpload,
+  Bookmark,
+  Zap,
+  Flame,
+  Target,
+  CalendarDays,
+  FolderOpen,
+  ClipboardPaste,
+  Smartphone
+};
+
+/** IconNode → chuỗi SVG (stroke currentColor, outline) */
+export function iconSvg(name, size = 20, className = "") {
+  const node = ICONS[name];
+  if (!node) return "";
+  const inner = node
+    .map(([tag, attrs]) => {
+      const a = Object.entries(attrs)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ");
+      return `<${tag} ${a}></${tag}>`;
+    })
+    .join("");
+  return `<svg class="ic ${className}" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
+
+/** Thay thế mọi <i data-icon="Name"> trong root bằng SVG */
+export function hydrateIcons(root = document) {
+  root.querySelectorAll("[data-icon]").forEach((el) => {
+    const size = Number(el.dataset.size || 20);
+    el.innerHTML = iconSvg(el.dataset.icon, size);
+    el.removeAttribute("data-icon");
+  });
+}

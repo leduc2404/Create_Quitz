@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#06080F" />
+    <meta name="description" content="Quitz — Ôn tập thông minh: lặp lại ngắt quãng, flashcard, timer. Tối giản, tập trung, offline, chia sẻ bằng 1 link." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Quitz" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>Quitz — Ôn tập tập trung</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Header tối giản -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand"><i data-icon="Sparkles" data-size="18"></i><span>Quitz</span></div>
+        <button id="authBtn" class="avatar-btn" aria-label="Đăng nhập"><i data-icon="User" data-size="18"></i></button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- ============ TAB: HOME ============ -->
+      <section class="tab-screen" id="homeScreen">
+        <div class="home-greet">
+          <h1 id="greetTitle">Sẵn sàng ôn tập?</h1>
+          <p class="muted" id="greetSub">Mỗi ngày một chút, nhớ lâu hơn.</p>
+        </div>
+
+        <div id="resumeBanner" class="resume-banner" hidden>
+          <div>
+            <strong>Phiên đang dở</strong>
+            <span class="muted" id="resumeMeta"></span>
+          </div>
+          <div class="banner-actions">
+            <button id="resumeBtn" class="text-btn">Tiếp tục</button>
+            <button id="discardSessionBtn" class="text-btn muted">Bỏ qua</button>
+          </div>
+        </div>
+
+        <div id="syncBanner" class="resume-banner" hidden>
+          <div>
+            <strong>Đồng bộ cloud</strong>
+            <span class="muted" id="syncBannerText"></span>
+          </div>
+          <button id="syncAllBtn" class="text-btn"><i data-icon="CloudUpload" data-size="16"></i> Đồng bộ</button>
+        </div>
+
+        <!-- Quick Start: 1 thẻ duy nhất nổi bật -->
+        <div class="quick-card">
+          <h2>Hôm nay là một ngày tốt<br />để <span class="gradient-text">nhớ lâu hơn</span></h2>
+          <p class="muted" id="quickSub">Bắt đầu phiên ôn tập của bạn.</p>
+          <button class="primary-btn" id="quickStartBtn"><i data-icon="Play" data-size="18"></i> Bắt đầu ngay</button>
+        </div>
+
+        <!-- Quick actions phụ — chỉ hiện khi có dữ liệu -->
+        <div class="home-actions">
+          <button class="chip-btn" id="reviewDueBtn" hidden>
+            <i data-icon="RotateCw" data-size="16"></i> Ôn câu yếu <span class="chip-count" id="duePill">0</span>
+          </button>
+          <button class="chip-btn" id="importantBtn" hidden>
+            <i data-icon="Bookmark" data-size="16"></i> Câu quan trọng <span class="chip-count" id="importantPill">0</span>
+          </button>
+          <button class="chip-btn" id="quickTenBtn">
+            <i data-icon="Zap" data-size="16"></i> Ôn nhanh 10 câu
+          </button>
+        </div>
+      </section>
+
+      <!-- ============ TAB: LIBRARY ============ -->
+      <section class="tab-screen" id="libraryScreen" hidden>
+        <div class="screen-head">
+          <h1>Thư viện</h1>
+          <span class="muted" id="libraryCount"></span>
+        </div>
+        <div id="emptyState" class="empty-state">
+          <i data-icon="FolderOpen" data-size="40"></i>
+          <p>Chưa có bộ đề nào.</p>
+          <button class="ghost-btn" id="emptyCreateBtn"><i data-icon="SquarePlus" data-size="18"></i> Tạo bộ đề đầu tiên</button>
+        </div>
+        <div class="quiz-list" id="filesList"></div>
+      </section>
+
+      <!-- ============ TAB: CREATE ============ -->
+      <section class="tab-screen" id="createScreen" hidden>
+        <div class="screen-head">
+          <h1>Tạo bộ đề</h1>
+        </div>
+
+        <div class="create-block">
+          <label class="field-label" for="jsonTextarea"><i data-icon="ClipboardPaste" data-size="16"></i> Dán JSON / nội dung</label>
+          <textarea class="input textarea" id="jsonTextarea" placeholder='Dán JSON vào đây...
+
+{
+  "questions": [
+    { "question": "Câu hỏi?", "options": ["A", "B"], "answer": "A" }
+  ]
+}'></textarea>
+          <button class="primary-btn" id="importPasteBtn"><i data-icon="WandSparkles" data-size="18"></i> Tạo bộ đề</button>
+          <p class="hint muted">Mẹo: nhấn Ctrl + V ở bất kỳ đâu để dán nhanh.</p>
+        </div>
+
+        <div class="divider"><span>hoặc</span></div>
+
+        <button class="file-drop" id="uploadCard">
+          <i data-icon="Upload" data-size="22"></i>
+          <span>Chọn file JSON từ máy</span>
+          <input type="file" id="fileInput" accept=".json" multiple />
+        </button>
+
+        <button class="ai-launch-btn" id="openAiBtn"><i data-icon="WandSparkles" data-size="18"></i> Tạo đề bằng AI</button>
+      </section>
+
+      <!-- ============ TAB: PROFILE ============ -->
+      <section class="tab-screen" id="profileScreen" hidden>
+        <div class="screen-head">
+          <h1>Cá nhân</h1>
+        </div>
+
+        <div class="profile-card" id="profileCard">
+          <div class="profile-avatar" id="profileAvatar"><i data-icon="User" data-size="22"></i></div>
+          <div class="profile-info">
+            <strong id="profileName">Khách</strong>
+            <span class="muted" id="profileEmail">Đăng nhập để đồng bộ cloud</span>
+          </div>
+          <button class="text-btn" id="profileAuthBtn">Đăng nhập</button>
+          <button class="text-btn danger" id="logoutBtn" hidden><i data-icon="LogOut" data-size="16"></i> Đăng xuất</button>
+        </div>
+
+        <div class="settings-list">
+          <div class="settings-row">
+            <span class="row-label"><i data-icon="Moon" data-size="18"></i> Giao diện tối</span>
+            <label class="switch">
+              <input type="checkbox" id="themeToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button class="settings-row btn-row" id="installBtn" hidden>
+            <span class="row-label"><i data-icon="Smartphone" data-size="18"></i> Cài đặt ứng dụng</span>
+            <i data-icon="ChevronRight" data-size="18"></i>
+          </button>
+        </div>
+
+        <p class="foot-note muted">From leducisme - Give for u</p>
+      </section>
+
+      <!-- ============ OVERLAY: TOPIC ============ -->
+      <section class="overlay-screen" id="topicSelection" hidden>
+        <div class="overlay-head">
+          <button class="icon-btn" id="topicBackBtn" aria-label="Quay lại"><i data-icon="X" data-size="20"></i></button>
+          <h1 id="subjectTitle"></h1>
+          <span class="spacer"></span>
+        </div>
+
+        <div class="limit-chips" role="group" aria-label="Chọn số câu ôn">
+          <button class="limit-chip active" data-limit="0">Tất cả</button>
+          <button class="limit-chip" data-limit="10">10 câu</button>
+          <button class="limit-chip" data-limit="20">20 câu</button>
+        </div>
+
+        <button class="primary-btn" id="startAllTopicsBtn"><i data-icon="Play" data-size="18"></i> Bắt đầu</button>
+        <p class="hint muted">Hoặc chọn một chủ đề:</p>
+        <div class="topic-grid" id="topicGrid"></div>
+      </section>
+
+      <!-- ============ OVERLAY: QUIZ ============ -->
+      <section class="overlay-screen" id="quizScreen" hidden>
+        <div class="quiz-top">
+          <button class="icon-btn" id="exitQuizBtn" aria-label="Thoát"><i data-icon="X" data-size="20"></i></button>
+          <div class="quiz-progress">
+            <span class="muted" id="questionCounter">1/10</span>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+          <span class="timer-chip" id="timerChip" hidden><i data-icon="Timer" data-size="15"></i><span id="timerText">0:30</span></span>
+          <button class="icon-btn" id="bookmarkBtn" aria-label="Đánh dấu câu quan trọng"><i data-icon="Bookmark" data-size="19"></i></button>
+        </div>
+
+        <div class="question-card" id="questionCard">
+          <div class="q-meta">
+            <span class="q-badge" id="topicBadge"></span>
+            <span class="q-badge soft" id="questionTypeBadge"></span>
+            <span class="q-id muted" id="questionId"></span>
+          </div>
+          <p class="q-text" id="questionText"></p>
+          <div class="options-container" id="optionsContainer"></div>
+        </div>
+
+        <button class="primary-btn bottom-cta" id="nextBtn">Câu tiếp theo</button>
+      </section>
+
+      <!-- ============ OVERLAY: RESULT ============ -->
+      <section class="overlay-screen" id="resultScreen" hidden>
+        <div class="result-wrap">
+          <div class="result-icon" id="resultIcon"></div>
+          <h1 id="resultTitle">Tuyệt vời!</h1>
+          <div class="result-score"><span id="finalScore">0</span><span class="muted">/<span id="totalQuestions">0</span></span></div>
+          <p class="muted" id="resultMessage"></p>
+
+          <div class="exam-warning" id="examWarning" hidden></div>
+          <div class="exam-table" id="examScoreTable" hidden></div>
+
+          <div class="result-actions">
+            <button class="primary-btn" id="restartBtn"><i data-icon="RotateCw" data-size="18"></i> Làm lại</button>
+            <button class="ghost-btn" id="retryWrongBtn" hidden><i data-icon="CircleX" data-size="18"></i> Câu sai</button>
+            <button class="ghost-btn" id="shareResultBtn" hidden><i data-icon="Share2" data-size="18"></i> Chia sẻ</button>
+            <button class="ghost-btn" id="homeBtn"><i data-icon="Home" data-size="18"></i> Trang chủ</button>
+          </div>
+
+          <div class="wrong-section" id="wrongAnswersSection" hidden>
+            <button class="wrong-header" id="wrongAnswersHeader">
+              <span>Xem lại câu sai (<span id="wrongCount">0</span>)</span>
+              <i data-icon="ChevronRight" data-size="18"></i>
+            </button>
+            <div class="wrong-list" id="wrongAnswersList"></div>
+          </div>
+
+          <div class="wrong-section" id="solutionSection" hidden>
+            <button class="wrong-header" id="solutionHeader">
+              <span>Đáp án &amp; lời giải từng câu</span>
+              <i data-icon="ChevronRight" data-size="18"></i>
+            </button>
+            <div class="wrong-list" id="solutionList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" id="bottomNav" aria-label="Điều hướng chính">
+      <button class="nav-btn active" data-tab="homeScreen"><i data-icon="Home" data-size="21"></i><span>Home</span></button>
+      <button class="nav-btn" data-tab="libraryScreen"><i data-icon="Library" data-size="21"></i><span>Thư viện</span></button>
+      <button class="nav-btn" data-tab="createScreen"><i data-icon="SquarePlus" data-size="21"></i><span>Tạo</span></button>
+      <button class="nav-btn" data-tab="profileScreen"><i data-icon="User" data-size="21"></i><span>Cá nhân</span></button>
+    </nav>
+
+    <!-- Modal: Tạo bộ đề (tên + icon + timer) -->
+    <div class="modal-overlay" id="createModal">
+      <div class="modal sheet-modal" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <h2>Bộ đề mới</h2>
+          <button class="icon-btn" id="createClose" aria-label="Đóng"><i data-icon="X" data-size="20"></i></button>
+        </div>
+
+        <label class="field-label" for="quizNameInput">Tên bộ đề</label>
+        <input class="input" id="quizNameInput" maxlength="60" placeholder="VD: Sinh học — Chương 1" />
+        <div class="exam-badge" id="examBadge" hidden></div>
+
+        <label class="field-label">Icon đại diện</label>
+        <div class="icon-grid" id="iconGrid"></div>
+
+        <div class="timer-block">
+          <div class="timer-head">
+            <span class="row-label"><i data-icon="Timer" data-size="18"></i> Hẹn giờ</span>
+            <label class="switch">
+              <input type="checkbox" id="timerToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="timer-body" id="timerBody" hidden>
+            <div class="seg" id="timerModeSeg">
+              <button class="seg-btn active" data-mode="question">Mỗi câu</button>
+              <button class="seg-btn" data-mode="total">Toàn bài</button>
+            </div>
+            <div class="time-pickers">
+              <div class="picker">
+                <button class="picker-btn" id="minPlus" aria-label="Tăng phút">+</button>
+                <div class="picker-value"><span id="minValue">0</span><small>phút</small></div>
+                <button class="picker-btn" id="minMinus" aria-label="Giảm phút">−</button>
+              </div>
+              <span class="picker-colon">:</span>
+              <div class="picker">
+                <button class="picker-btn" id="secPlus" aria-label="Tăng giây">+</button>
+                <div class="picker-value"><span id="secValue">30</span><small>giây</small></div>
+                <button class="picker-btn" id="secMinus" aria-label="Giảm giây">−</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="primary-btn" id="createSaveBtn"><i data-icon="CircleCheck" data-size="18"></i> Lưu bộ đề</button>
+      </div>
+    </div>
+
+    <!-- Modal: AI prompt -->
+    <div class="modal-overlay" id="aiModal">
+      <div class="modal sheet-modal wide" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <h2>Tạo JSON bằng AI</h2>
+          <button class="icon-btn" id="aiClose" aria-label="Đóng"><i data-icon="X" data-size="20"></i></button>
+        </div>
+        <p class="hint muted" style="margin-bottom: 16px;">Copy prompt, dán vào AI Studio, chọn Gemini và kéo Temperature xuống thấp nhất.</p>
+
+        <div class="seg" id="promptSeg">
+          <button class="seg-btn active" data-prompt="tracnghiem">Trắc nghiệm</button>
+          <button class="seg-btn" data-prompt="tuluan">Tự luận</button>
+          <button class="seg-btn" data-prompt="thpt2026">Đề THPT 2026</button>
+        </div>
+
+        <div class="prompt-content active" id="promptTracNghiem">
+          <pre class="prompt-box" id="promptBox">OCR chính xác text lẫn đáp án (đáp án được in đậm, bôi màu,...), viết nó thành dạng json với định dạng:
+{
+  "type": "multiple_choice",
+  "topic": "TÊN CHỦ ĐỀ",
+  "questions": [
+    {
+      "id": "CD1_1",
+      "question": "Câu hỏi?",
+      "options": ["A. Đáp án A", "B. Đáp án B", "C. Đáp án C", "D. Đáp án D"],
+      "answer": "A. Đáp án A"
+    }
+  ]
+}
+
+Đảm bảo chính xác từng chữ lẫn đáp án, không cắt bỏ, không làm ngắn, làm hết tất cả câu hỏi 1 cách chính xác.
+Nếu có lỗi chính tả hoặc in hoa sai thì sửa nó.
+ID câu hỏi theo dạng: CD{số chủ đề}_{số câu}</pre>
+          <button class="ghost-btn" data-prompt="tracnghiem" id="copyBtnTN"><span id="copyBtnTextTN">Copy prompt</span></button>
+        </div>
+
+        <div class="prompt-content" id="promptTuLuan">
+          <pre class="prompt-box" id="promptBoxEssay">OCR chính xác câu hỏi tự luận từ ảnh, không được tự ý cắt ngắn, viết nó thành dạng JSON với định dạng:
+{
+  "type": "essay",
+  "topic": "TÊN CHỦ ĐỀ",
+  "questions": [
+    {
+      "id": 1,
+      "topic": "Tên chủ đề con (nếu có)",
+      "question": "Câu hỏi tự luận?",
+      "answer": "- Ý 1: Nội dung chi tiết...\n- Ý 2: Nội dung chi tiết..."
+    }
+  ]
+}
+
+Quy tắc:
+- Mỗi ý chính trong đáp án bắt đầu bằng dấu gạch "-"
+- Dùng \n để xuống dòng trong answer
+- Đảm bảo chính xác từng chữ, không cắt bỏ, làm hết tất cả câu hỏi
+- Nếu có lỗi chính tả hoặc in hoa sai thì sửa nó</pre>
+          <button class="ghost-btn" data-prompt="tuluan" id="copyBtnTL"><span id="copyBtnTextTL">Copy prompt</span></button>
+        </div>
+
+        <div class="prompt-content" id="promptThpt2026">
+          <pre class="prompt-box" id="promptBoxThpt">Bạn là hệ thống chuyên gia khảo thí, được thiết kế để tự động nhận diện, giải thích và chấm điểm đề thi Tốt nghiệp THPT 2026 chuẩn theo cấu trúc mới của Bộ Giáo dục &amp; Đào tạo. Nhận dạng đề thi từ dữ liệu người dùng cung cấp (ảnh/PDF/văn bản) và xuất JSON đúng định dạng sau:
+
+{
+  "examFormat": "thpt2026",
+  "subject": "TÊN MÔN",
+  "parts": [
+    {
+      "part": "I",
+      "type": "multiple_choice",
+      "questions": [
+        {
+          "question": "Nội dung câu hỏi",
+          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+          "answer": "A. ...",
+          "explanation": "Lời giải chi tiết (bắt buộc)"
+        }
+      ]
+    },
+    {
+      "part": "II",
+      "type": "true_false",
+      "questions": [
+        {
+          "question": "Nội dung câu dẫn",
+          "items": [
+            { "text": "ý a", "correct": true },
+            { "text": "ý b", "correct": false },
+            { "text": "ý c", "correct": true },
+            { "text": "ý d", "correct": false }
+          ],
+          "explanation": "Lời giải chi tiết từng ý (bắt buộc)"
+        }
+      ]
+    },
+    {
+      "part": "III",
+      "type": "short_answer",
+      "questions": [
+        {
+          "question": "Nội dung câu hỏi",
+          "answer": "0.25",
+          "explanation": "Lời giải chi tiết (bắt buộc)"
+        }
+      ]
+    }
+  ]
+}
+
+CẤU TRÚC CHUẨN THANG 10:
+- NHÓM 1 - TOÁN: Phần I: 12 câu trắc nghiệm 4 lựa chọn (0.25đ/câu); Phần II: 4 câu Đúng/Sai, mỗi câu 4 ý a,b,c,d (tối đa 1.0đ/câu); Phần III: 6 câu trả lời ngắn (0.5đ/câu).
+- NHÓM 2 - VẬT LÍ, HÓA HỌC, SINH HỌC, ĐỊA LÍ: Phần I: 18 câu (0.25đ/câu); Phần II: 4 câu Đúng/Sai (tối đa 1.0đ/câu); Phần III: 6 câu trả lời ngắn (0.25đ/câu).
+- NHÓM 3 - LỊCH SỬ, GD KINH TẾ &amp; PHÁP LUẬT, TIN HỌC, CÔNG NGHỆ: Phần I: 24 câu (0.25đ/câu); Phần II: 4 câu Đúng/Sai (tối đa 1.0đ/câu); KHÔNG có Phần III.
+
+QUY TẮC:
+- Luôn có trường "subject" với tên môn đầy đủ (VD: Toán, Vật lí, Hóa học, Sinh học, Lịch sử, Địa lí, Giáo dục kinh tế và pháp luật, Tin học, Công nghệ).
+- Đề đầy đủ: giữ nguyên đúng số câu từng phần theo cấu trúc chuẩn của môn. Đề trích đoạn: xuất đúng những câu có được, KHÔNG bịa thêm câu.
+- Phần II: mỗi câu đúng 4 ý a,b,c,d với "correct": true/false chính xác từng ý.
+- Phần III: "answer" là con số thuần túy (VD: -1.5, 0.25, 2026), dùng dấu chấm thập phân.
+- OCR chính xác từng chữ, không cắt ngắn, không bịa nội dung; sửa lỗi chính tả; mọi câu đều có "explanation" là lời giải chi tiết.</pre>
+          <button class="ghost-btn" data-prompt="thpt2026" id="copyBtnTHPT"><span id="copyBtnTextTHPT">Copy prompt</span></button>
+        </div>
+
+        <a href="https://aistudio.google.com/" target="_blank" rel="noopener" class="text-btn center">Mở Google AI Studio</a>
+      </div>
+    </div>
+
+    <!-- Modal: Share incoming -->
+    <div class="modal-overlay" id="shareModal">
+      <div class="modal sheet-modal" role="dialog" aria-modal="true">
+        <div class="modal-head"><h2>Quiz được chia sẻ</h2></div>
+        <p class="hint" id="shareModalInfo"></p>
+        <div class="modal-actions">
+          <button class="ghost-btn" id="shareCancelBtn">Bỏ qua</button>
+          <button class="primary-btn" id="shareAcceptBtn">Thêm vào thư viện</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Auth -->
+    <div class="modal-overlay" id="authModal">
+      <div class="modal sheet-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="modal-head">
+          <h2 id="authTitle">Đăng nhập</h2>
+          <button class="icon-btn" id="authClose" aria-label="Đóng"><i data-icon="X" data-size="20"></i></button>
+        </div>
+        <div class="seg" id="authSeg">
+          <button type="button" id="tabLogin" class="seg-btn active">Đăng nhập</button>
+          <button type="button" id="tabSignup" class="seg-btn">Đăng ký</button>
+        </div>
+        <form id="authForm">
+          <input type="email" id="authEmail" class="input" placeholder="Email" autocomplete="email" />
+          <input type="password" id="authPassword" class="input" placeholder="Mật khẩu (≥ 6 ký tự)" autocomplete="current-password" minlength="6" />
+          <p class="error-text" id="authError" hidden></p>
+          <button type="submit" class="primary-btn" id="authSubmit">Đăng nhập</button>
+        </form>
+        <div class="divider"><span>hoặc</span></div>
+        <button type="button" id="googleBtn" class="ghost-btn full">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC04" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Tiếp tục với Google
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal: Confirm -->
+    <div class="modal-overlay" id="confirmModal">
+      <div class="modal sheet-modal" role="alertdialog" aria-modal="true">
+        <div class="modal-head"><h2 id="confirmTitle">Xác nhận</h2></div>
+        <p class="hint" id="confirmMessage"></p>
+        <div class="modal-actions">
+          <button id="confirmCancel" class="ghost-btn">Hủy</button>
+          <button id="confirmOk" class="primary-btn">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Prompt (đổi tên) -->
+    <div class="modal-overlay" id="promptModal">
+      <div class="modal sheet-modal" role="dialog" aria-modal="true">
+        <div class="modal-head"><h2 id="promptTitle">Đổi tên</h2></div>
+        <input class="input" id="promptInput" maxlength="60" />
+        <div class="modal-actions">
+          <button id="promptCancel" class="ghost-btn">Hủy</button>
+          <button id="promptOk" class="primary-btn">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onboarding -->
+    <div class="onboarding-overlay" id="onboarding" hidden>
+      <div class="onboarding-card">
+        <div class="onboarding-step" data-step="0">
+          <span class="onboarding-icon"><i data-icon="ClipboardPaste" data-size="30"></i></span>
+          <h3>Dán là xong</h3>
+          <p>Dán JSON, thả file, hoặc mở link bạn bè chia sẻ — bộ đề hiện ra ngay.</p>
+        </div>
+        <div class="onboarding-step" data-step="1" hidden>
+          <span class="onboarding-icon"><i data-icon="Brain" data-size="30"></i></span>
+          <h3>Nhớ lâu hơn</h3>
+          <p>Câu sai tự quay lại đúng lúc sắp quên. Câu tự luận học bằng flashcard tự chấm.</p>
+        </div>
+        <div class="onboarding-step" data-step="2" hidden>
+          <span class="onboarding-icon"><i data-icon="Bookmark" data-size="30"></i></span>
+          <h3>Tập trung tuyệt đối</h3>
+          <p>Đánh dấu câu quan trọng, bật timer thử thách, và ôn trong giao diện tối giản.</p>
+        </div>
+        <div class="onboarding-dots">
+          <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <div class="onboarding-actions">
+          <button id="onboardingSkip" class="text-btn muted">Bỏ qua</button>
+          <button id="onboardingNext" class="primary-btn">Tiếp</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

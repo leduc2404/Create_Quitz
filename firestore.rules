@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Quitz — Firestore security rules
+// Mô hình dữ liệu:
+//   quizzes/{cloudId}            : bộ đề (ownerId, isPublic)
+//   users/{uid}/results/{id}     : lịch sử kết quả làm bài
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Bộ đề: chủ sở hữu toàn quyền; người lạ CHỈ đọc được đề công khai (mở link chia sẻ).
+    match /quizzes/{quizId} {
+      allow read: if resource.data.isPublic == true
+                  || request.auth != null
+                  && request.auth.uid == resource.data.ownerId;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.ownerId;
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.ownerId;
+    }
+
+    // Dữ liệu cá nhân: chỉ chính chủ được đọc/ghi.
+    match /users/{uid}/results/{resultId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Mặc định: từ chối mọi thứ khác.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

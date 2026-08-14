@@ -1,0 +1,22 @@
+{
+  "name": "quitz",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Quiz App - Tải lên JSON & ôn tập. PWA + Firebase.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "icons": "node scripts/gen-icons.cjs",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "dependencies": {
+    "firebase": "^10.14.1",
+    "lucide": "^1.31.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}
