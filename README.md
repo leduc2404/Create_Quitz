@@ -74,7 +74,10 @@ firebase login
 firebase init hosting   # chọn dist/ làm public dir, Yes cho SPA rewrite
 npm run deploy          # = build + firebase deploy
 ```
-Sau khi deploy, thêm domain `*.web.app` vào **Authentication → Settings → Authorized domains** (localhost đã có sẵn).
+Sau khi deploy, thêm domain host vào **Authentication → Settings → Authorized domains** (localhost đã có sẵn):
+- Firebase Hosting: `*.web.app` tự thêm sẵn.
+- Vercel: thêm `ten-project.vercel.app`.
+- Lưu ý: `.env` không được push lên GitHub — trên Vercel phải dán lại 6 biến `VITE_FIREBASE_*` trong *Settings → Environment Variables* rồi redeploy.
 
 ## 📱 Cài thành app (PWA)
 
