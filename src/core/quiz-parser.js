@@ -23,7 +23,11 @@ export function parseQuizData(data, fileName) {
   let quizType = rootFormat || "multiple_choice";
 
   // Case 0: Đề thi Tốt nghiệp THPT 2026 (cấu trúc Phần I/II/III)
-  if (data && typeof data === "object" && (rootFormat === "thpt2026" || (data.parts && Array.isArray(data.parts)))) {
+  const isThpt =
+    rootFormat === "thpt2026" ||
+    (!rootFormat && data && data.examFormat === "thpt2026") ||
+    (!rootFormat && data && data.subject && data.parts && Array.isArray(data.parts));
+  if (data && typeof data === "object" && isThpt && rootFormat !== "mixed") {
     return parseThpt2026(data, fileName);
   }
 
@@ -98,6 +102,34 @@ export function parseQuizData(data, fileName) {
     const normalized = normalizeQuestions(rawList, mainTopic, quizType);
     topics.push({ topic: mainTopic, questions: normalized });
     questions = normalized;
+  }
+  // Case 2.5: Object with sections, parts, or groups (phân chia theo từng phần)
+  else if (
+    data && typeof data === "object" &&
+    (Array.isArray(data.sections) || Array.isArray(data.parts) || Array.isArray(data.groups))
+  ) {
+    const list = data.sections || data.parts || data.groups;
+    mainTopic = data.topic || data.title || data.subject || mainTopic;
+    list.forEach((sec, idx) => {
+      const secName = sec.section || sec.part || sec.title || sec.name || `Phần ${idx + 1}`;
+      let secType = sec.type || sec.format || "";
+      if (!secType) {
+        const sLower = secName.toLowerCase();
+        if (sLower.includes("tự luận") || sLower.includes("tu luan") || sLower.includes("essay")) secType = "essay";
+        else if (sLower.includes("trả lời ngắn") || sLower.includes("tra loi ngan") || sLower.includes("short")) secType = "short_answer";
+        else if (sLower.includes("đúng sai") || sLower.includes("dung sai") || sLower.includes("true")) secType = "true_false";
+        else if (sLower.includes("trắc nghiệm") || sLower.includes("trac nghiem") || sLower.includes("choice")) secType = "multiple_choice";
+      }
+      const rawQs = sec.questions || sec.items || [];
+      if (Array.isArray(rawQs) && rawQs.length > 0) {
+        const normalized = rawQs.map((q, qIdx) => {
+          const qType = q.type || secType || "";
+          return normalizeQuestion({ ...q, type: qType, part: secName }, secName, qIdx, qType || "mixed");
+        });
+        topics.push({ topic: secName, questions: normalized });
+        questions.push(...normalized.map((q) => ({ ...q })));
+      }
+    });
   }
   // Case 3: Object with nested structure
   else if (typeof data === "object" && data !== null) {
@@ -187,6 +219,19 @@ export function normalizeQuestion(q, topic, index, type = "multiple_choice") {
       : (q.acceptableAnswers || q.tolerance != null || /^-?\d+([.,]\d+)?$/.test(String(answerVal).trim()))
       ? "short_answer"
       : "essay";
+  }
+
+  // Đảm bảo tính toàn vẹn: multiple_choice bắt buộc có options; có options thì là trắc nghiệm
+  if (questionType === "multiple_choice" && !hasOptions) {
+    if (Array.isArray(q.items) && q.items.length > 0) {
+      questionType = "true_false";
+    } else if (q.acceptableAnswers || q.tolerance != null || /^-?\d+([.,]\d+)?$/.test(String(answerVal).trim())) {
+      questionType = "short_answer";
+    } else {
+      questionType = "essay";
+    }
+  } else if (questionType === "essay" && hasOptions) {
+    questionType = "multiple_choice";
   }
 
   // Tự động nhận diện chỉ số chỗ trống đục lỗ (blankIndex) nếu câu hỏi chưa khai báo

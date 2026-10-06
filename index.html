@@ -480,7 +480,7 @@
 
         <!-- 0. Master Prompt Đa Năng — Hợp nhất & Tự động thích ứng mọi thể loại bài -->
         <div class="prompt-content active" id="promptMaster">
-          <pre class="prompt-box" id="promptBoxMaster">Bạn là hệ thống AI sư phạm chuyên tạo đề thi &amp; bài tập thông minh. Dựa vào nội dung người dùng cung cấp (tài liệu/ảnh/PDF/chủ đề), hãy tự động nhận diện dạng bài phù hợp nhất hoặc tạo theo yêu cầu và xuất ra MỘT FILE JSON DUY NHẤT theo cấu trúc đa năng dưới đây:
+          <pre class="prompt-box" id="promptBoxMaster">Bạn là hệ thống AI sư phạm chuyên gia tạo đề thi khảo thí thông minh toàn diện. Dựa vào nội dung người dùng cung cấp (tài liệu/ảnh/PDF/chủ đề), trong MỘT LẦN SINH DUY NHẤT hãy tạo ra MỘT BỘ ĐỀ TỔNG HỢP KẾT HỢP ĐỒNG THỜI TẤT CẢ CÁC DẠNG BÀI PHÙ HỢP (không chọn duy nhất 1 loại), xuất ra chuẩn MỘT FILE JSON DUY NHẤT theo cấu trúc dưới đây:
 
 {
   "format": "mixed",
@@ -489,7 +489,8 @@
     {
       "id": "Q1",
       "type": "multiple_choice",
-      "question": "Nội dung câu hỏi trắc nghiệm 4 lựa chọn?",
+      "topic": "Trắc nghiệm 4 lựa chọn",
+      "question": "Nội dung câu hỏi trắc nghiệm 4 phương án A, B, C, D?",
       "options": [
         "A. Phương án A",
         "B. Phương án B",
@@ -497,64 +498,63 @@
         "D. Phương án D"
       ],
       "answer": "A. Phương án A",
-      "explanation": "Lời giải thích chi tiết từng bước vì sao đáp án này đúng."
+      "explanation": "Lời giải thích chi tiết vì sao phương án này đúng và các phương án khác sai."
     },
     {
       "id": "Q2",
-      "type": "short_answer",
-      "question": "Câu hỏi trả lời ngắn (yêu cầu điền từ khóa, thuật ngữ hoặc con số)?",
-      "answer": "Đáp án chuẩn",
-      "acceptableAnswers": ["Cách viết khác 1", "Từ đồng nghĩa 2"],
-      "explanation": "Giải thích chi tiết kiến thức và các cách diễn đạt được chấp nhận. Người học có thể tự gõ bàn phím hoặc bấm xem đáp án để tự đối chiếu."
-    },
-    {
-      "id": "Q3",
-      "type": "essay",
-      "question": "Câu hỏi tự luận yêu cầu phân tích, chứng minh hoặc giải thích chi tiết?",
-      "answer": "- Ý 1: Luận điểm chính phân tích...\n- Ý 2: Dẫn chứng hoặc bước tính toán...\n- Ý 3: Kết luận...",
-      "explanation": "Tiêu chí chấm điểm và thang điểm chi tiết cho từng ý."
-    },
-    {
-      "id": "Q4",
       "type": "true_false",
-      "question": "Cho các nhận định sau. Hãy xác định tính Đúng/Sai của từng ý:",
+      "topic": "Đúng - Sai 4 nhận định",
+      "question": "Cho các nhận định/thông tin sau. Hãy xác định tính Đúng hoặc Sai của từng ý:",
       "items": [
         { "text": "Nhận định a...", "correct": true },
         { "text": "Nhận định b...", "correct": false },
         { "text": "Nhận định c...", "correct": true },
         { "text": "Nhận định d...", "correct": false }
       ],
-      "explanation": "Giải thích chi tiết tính đúng sai của từng nhận định a, b, c, d."
+      "explanation": "Giải thích chi tiết căn cứ đúng/sai cho từng nhận định a, b, c, d."
+    },
+    {
+      "id": "Q3",
+      "type": "short_answer",
+      "topic": "Trả lời ngắn / Điền số hoặc từ",
+      "question": "Câu hỏi yêu cầu điền kết quả ngắn gọn (từ khóa, thuật ngữ chuyên môn hoặc kết quả tính toán số học)?",
+      "answer": "Đáp án chuẩn",
+      "acceptableAnswers": ["Cách viết khác 1", "Từ đồng nghĩa 2", "12.5", "12,5"],
+      "explanation": "Giải thích chi tiết các bước tính hoặc lý thuyết cốt lõi. (Người học có thể gõ phím HOẶC bấm 'Xem đáp án' để tự đối chiếu &amp; đánh giá)."
+    },
+    {
+      "id": "Q4",
+      "type": "essay",
+      "topic": "Tự luận / Lý thuyết mở",
+      "question": "Câu hỏi tự luận yêu cầu phân tích, giải thích cơ chế, chứng minh hoặc trình bày bài giải chi tiết?",
+      "answer": "- Ý 1: Khái niệm hoặc luận điểm chính...\n- Ý 2: Dẫn chứng hoặc các bước phân tích chi tiết...\n- Ý 3: Kết luận / Giải pháp thực tiễn...",
+      "explanation": "Tiêu chí chấm điểm và thang điểm chi tiết cho từng ý."
     },
     {
       "id": "Q5",
       "type": "multiple_choice",
+      "topic": "Đọc hiểu / Bài tập đục lỗ (nếu có)",
       "passageTitle": "Tiêu đề bài đọc hoặc đoạn văn (nếu có)",
       "passage": "Nội dung bài đọc dài hoặc đoạn văn đục lỗ có đánh số (1) _____, (2) _____...",
       "blankIndex": 1,
-      "question": "Câu hỏi đọc hiểu HOẶC chọn từ điền vào chỗ trống (1):",
+      "question": "Câu hỏi đọc hiểu ngữ liệu HOẶC chọn từ điền vào vị trí (1):",
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "answer": "A. ...",
-      "explanation": "Trích dẫn dòng/câu trong bài đọc và giải thích ngữ cảnh."
+      "explanation": "Trích dẫn dòng/câu trong bài đọc và giải thích ngữ cảnh chi tiết."
     }
   ]
 }
 
-HƯỚNG DẪN QUYẾT ĐỊNH DẠNG BÀI ("format" ở cấp gốc):
-1. "mixed": Khi đề thi kết hợp linh hoạt nhiều dạng câu hỏi (trắc nghiệm + trả lời ngắn + tự luận + đúng/sai). Đây là định dạng đa năng và khuyên dùng nhất!
-2. "multiple_choice": Khi toàn bộ là câu hỏi trắc nghiệm 4 lựa chọn (A, B, C, D).
-3. "short_answer": Khi toàn bộ là câu hỏi điền từ, trả lời ngắn hoặc điền số.
-4. "essay": Khi toàn bộ là câu hỏi tự luận, lý thuyết mở, flashcard lật mặt.
-5. "thpt2026": Nếu là đề thi chuẩn cấu trúc tốt nghiệp THPT 2026 của Bộ GD&amp;ĐT (dùng "parts" gồm Phần I, Phần II, Phần III).
-6. "flashcard": Nếu tạo bộ thẻ ghi nhớ 2 mặt (dùng "cards": [{ "front": "...", "back": "...", "example": "..." }]).
-
-QUY TẮC CHO TỪNG LOẠI CÂU HỎI ("type" trong mỗi câu hỏi):
-- "multiple_choice": Bắt buộc có "options" (4 lựa chọn A, B, C, D) và "answer".
-- "short_answer": "answer" là đáp án chuẩn nhất; "acceptableAnswers" là mảng các từ đồng nghĩa hoặc cách viết khác (chữ hoặc số). Người học có thể gõ bàn phím HOẶC bấm 'Xem đáp án' để tự đối chiếu &amp; đánh giá.
-- "essay": "answer" ghi các ý chính theo gạch đầu dòng ("- Ý...") và phân cách bằng "\n" để người học dễ lật thẻ tự so sánh.
-- "true_false": Bắt buộc có mảng "items" gồm các ý và "correct": true/false.
-- Bài đọc/Đục lỗ: Khai báo trường "passage" cho toàn bài đọc; với bài đục lỗ thêm "blankIndex" là số thứ tự chỗ trống (1, 2, 3...).
-- BẮT BUỘC có trường "explanation" cho mọi câu hỏi để giải thích chi tiết, từng bước.</pre>
+QUY TẮC BẮT BUỘC ĐỐI VỚI AI KHI SINH ĐỀ:
+1. ĐA DẠNG HÓA TRONG 1 LẦN SINH: Tạo đồng thời nhiều loại câu hỏi khác nhau ("multiple_choice", "true_false", "short_answer", "essay") trong cùng một mảng "questions". Tuyệt đối KHÔNG chỉ sinh duy nhất 1 loại đơn lẻ.
+2. TÍNH LINH HOẠT VỀ THÀNH PHẦN: Nếu tài liệu thiếu ngữ liệu cho một dạng cụ thể (ví dụ không có bài đọc hoặc không có số liệu tính toán), bạn có thể linh hoạt bỏ qua dạng đó. Hệ thống tự động xử lý và chấm điểm mọi tổ hợp (Trắc nghiệm + TLN; Trắc nghiệm + Tự luận; hoặc đầy đủ cả 4 loại).
+3. ĐỊNH DẠNG "format": Luôn đặt là "mixed" ở cấp gốc JSON.
+4. "multiple_choice": Bắt buộc có mảng "options" (4 lựa chọn A, B, C, D) và "answer".
+5. "true_false": Bắt buộc có mảng "items" gồm các ý nhận định với "text" và "correct": true/false.
+6. "short_answer": "answer" là đáp án chuẩn nhất; "acceptableAnswers" chứa các dạng viết khác, đồng nghĩa hoặc định dạng số (dấu chấm/phẩy).
+7. "essay": "answer" ghi các ý chính theo từng gạch đầu dòng ("- Ý...") và phân cách bằng "\n" để người học dễ lật thẻ tự so sánh.
+8. BÀI ĐỌC DÀI / ĐỤC LỖ: Tích hợp trường "passage" cho toàn bài đọc; nếu là bài đục lỗ thì thêm "blankIndex" (1, 2, 3...).
+9. BẮT BUỘC có trường "explanation" cho MỌI câu hỏi để học sinh xem lời giải chi tiết từng bước sau khi làm.</pre>
           <button class="ghost-btn" data-prompt="master" id="copyBtnMaster"><span id="copyBtnTextMaster">Copy Master Prompt</span></button>
         </div>
 

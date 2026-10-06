@@ -12,7 +12,8 @@ import { formatRichText } from "../util.js";
 const TYPE_LABELS = {
   multiple_choice: "Trắc nghiệm",
   true_false: "Đúng – Sai",
-  short_answer: "Trả lời ngắn"
+  short_answer: "Trả lời ngắn",
+  essay: "Tự luận"
 };
 
 export function initResultView({ onRestart, onRetryWrong, onHome }) {

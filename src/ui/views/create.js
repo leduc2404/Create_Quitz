@@ -165,7 +165,7 @@ function openCreateModal(parsed) {
     : parsed.fileName;
   nameInput.value = suggested.replace(/\.json$/i, "");
 
-  // Badge nhận diện đề thi THPT 2026
+  // Badge nhận diện đề thi THPT 2026 hoặc bộ đề hỗn hợp đa dạng
   const badge = document.getElementById("examBadge");
   if (parsed.exam) {
     const v = parsed.exam.validation;
@@ -174,6 +174,16 @@ function openCreateModal(parsed) {
       v.status === "complete"
         ? `${parsed.exam.subject || "Đề 2026"} · Đề chuẩn 2026 · Hoàn chỉnh`
         : `${parsed.exam.subject || "Đề 2026"} · Trích đoạn · Chưa đủ cấu trúc chuẩn`;
+  } else if (parsed.quizType === "mixed") {
+    badge.hidden = false;
+    const typesPresent = [...new Set(parsed.questions.map((q) => q.type))].map((t) => {
+      if (t === "multiple_choice") return "Trắc nghiệm";
+      if (t === "true_false") return "Đúng/Sai";
+      if (t === "short_answer") return "Trả lời ngắn";
+      if (t === "essay") return "Tự luận";
+      return t;
+    }).join(" + ");
+    badge.textContent = `🎯 Bộ đề tích hợp đa năng · ${parsed.questions.length} câu (${typesPresent})`;
   } else {
     badge.hidden = true;
   }
