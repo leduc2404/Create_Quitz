@@ -620,3 +620,43 @@ function normalizeExamQuestion(q, partLabel, type, index, points, topic) {
   }
   return base;
 }
+
+/**
+ * Nhận diện dạng câu hỏi chuẩn: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'flashcard'
+ */
+export function getQuestionType(question) {
+  if (!question) return "multiple_choice";
+  if (question.type && question.type !== "mixed") {
+    const ct = canonicalQuestionType(question.type);
+    if (ct) return ct;
+  }
+  if (Array.isArray(question.items) && question.items.length > 0) return "true_false";
+  if (Array.isArray(question.options) && question.options.length > 0) return "multiple_choice";
+  if (
+    (Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0) ||
+    question.tolerance != null ||
+    /^-?\d+([.,]\d+)?$/.test(String(question.answer || "").trim())
+  ) {
+    return "short_answer";
+  }
+  return "essay";
+}
+
+/**
+ * Lọc danh sách câu hỏi theo dạng yêu cầu:
+ * - 'all': giữ nguyên tất cả
+ * - 'multiple_choice': gồm cả 'multiple_choice' và 'true_false'
+ * - 'short_answer': 'short_answer'
+ * - 'essay': 'essay'
+ */
+export function filterQuestionsByType(questions, filterType = "all") {
+  if (!questions || !Array.isArray(questions)) return [];
+  if (!filterType || filterType === "all") return [...questions];
+  return questions.filter((q) => {
+    const t = getQuestionType(q);
+    if (filterType === "multiple_choice") {
+      return t === "multiple_choice" || t === "true_false";
+    }
+    return t === filterType;
+  });
+}

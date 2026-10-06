@@ -15,6 +15,7 @@ import { toast, toastSuccess } from "./ui/toast.js";
 import { initHomeView, renderStats } from "./ui/views/home.js";
 import { initLibraryView } from "./ui/views/library.js";
 import { initCreateView, importJSON } from "./ui/views/create.js";
+import { filterQuestionsByType } from "./core/quiz-parser.js";
 import { initProfileView } from "./ui/views/profile.js";
 import { initTopicsView, showTopicSelection } from "./ui/views/topics.js";
 import { initQuizView, enterQuizScreen } from "./ui/views/quiz.js";
@@ -39,9 +40,16 @@ hydrateIcons();
 // Context của phiên quiz gần nhất (phục vụ "Làm lại")
 let lastStart = null;
 
-function beginQuiz(quiz, questions, label, mode = "practice") {
-  lastStart = { quiz, questions, label, mode };
-  engine.start({ quizId: quiz?.id ?? null, label, questions, exam: quiz?.exam || null, mode });
+function beginQuiz(quiz, questions, label, mode = "practice", shuffle = false) {
+  lastStart = { quiz, questions, label, mode, shuffle };
+  engine.start({
+    quizId: quiz?.id ?? null,
+    label,
+    questions,
+    exam: quiz?.exam || null,
+    mode,
+    shuffle
+  });
   enterQuizScreen();
 }
 
@@ -102,22 +110,24 @@ initCreateView();
 initProfileView();
 
 initTopicsView({
-  onAllTopics: (quiz, limit, mode) => {
-    const questions = limit
-      ? shuffleArray([...quiz.questions]).slice(0, limit)
-      : quiz.questions;
-    beginQuiz(
-      quiz,
-      questions,
-      limit ? `${quiz.fileName} — ${questions.length} câu` : quiz.fileName,
-      mode
-    );
+  onAllTopics: (quiz, limit, mode, qType, order) => {
+    let pool = filterQuestionsByType(quiz.questions || [], qType);
+    const isShuffle = order === "shuffle";
+    if (limit && limit > 0) {
+      pool = isShuffle
+        ? shuffleArray([...pool]).slice(0, limit)
+        : pool.slice(0, limit);
+    }
+    const label = limit ? `${quiz.fileName} — ${pool.length} câu` : quiz.fileName;
+    beginQuiz(quiz, pool, label, mode, isShuffle);
   },
-  onSelectTopic: (quiz, topicIndex, mode) => {
+  onSelectTopic: (quiz, topicIndex, mode, qType, order) => {
     const topic = quiz.topics ? quiz.topics[topicIndex] : null;
-    const questions = topic ? topic.questions : quiz.questions;
+    const baseList = topic ? (topic.questions || []) : (quiz.questions || []);
+    let pool = filterQuestionsByType(baseList, qType);
+    const isShuffle = order === "shuffle";
     const label = topic ? `${quiz.fileName} — ${topic.topic}` : quiz.fileName;
-    beginQuiz(quiz, questions, label, mode);
+    beginQuiz(quiz, pool, label, mode, isShuffle);
   },
   onBack: () => showTab("libraryScreen")
 });
@@ -136,7 +146,9 @@ initQuizView({
 
 initResultView({
   onRestart: () => {
-    if (lastStart) beginQuiz(lastStart.quiz, lastStart.questions, lastStart.label, lastStart.mode);
+    if (lastStart) {
+      beginQuiz(lastStart.quiz, lastStart.questions, lastStart.label, lastStart.mode, lastStart.shuffle);
+    }
   },
   onRetryWrong: () => {
     const wrongQuestions = engine.wrongAnswers.map((w) => ({

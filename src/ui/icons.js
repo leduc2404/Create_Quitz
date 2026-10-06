@@ -61,7 +61,9 @@ import {
   Minimize2,
   BarChart3,
   Clock,
-  Layers
+  Layers,
+  ListOrdered,
+  Shuffle
 } from "lucide";
 export const ICONS = {
   Home,
@@ -125,7 +127,9 @@ export const ICONS = {
   Minimize2,
   BarChart3,
   Clock,
-  Layers
+  Layers,
+  ListOrdered,
+  Shuffle
 };
 
 /** IconNode → chuỗi SVG (stroke currentColor, outline) */

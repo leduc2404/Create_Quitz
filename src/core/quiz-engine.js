@@ -31,7 +31,7 @@ export function cleanOptionPrefix(str = "") {
 /**
  * Chuẩn hóa câu hỏi: Gọt sạch tiền tố A, B, C, D trong options và ánh xạ answer
  */
-function prepareQuestion(q, isExam) {
+function prepareQuestion(q, isExam, shuffle = false) {
   if (!q.options || q.options.length === 0) {
     return { ...q };
   }
@@ -64,7 +64,7 @@ function prepareQuestion(q, isExam) {
   }
 
   let cleanOptions = parsedOptions.map((p) => p.text);
-  if (!isExam) {
+  if (shuffle) {
     cleanOptions = shuffleArray([...cleanOptions]);
   }
 
@@ -85,6 +85,7 @@ export class QuizEngine {
     this.quizId = null;
     this.label = "";
     this.studyMode = "practice"; // 'practice' | 'exam' | 'flashcard'
+    this.shuffle = false;
     this.questions = [];
     this.index = 0;
     this.score = 0;
@@ -109,19 +110,21 @@ export class QuizEngine {
     questions,
     exam = null,
     timerSeconds = null,
-    mode = "practice"
+    mode = "practice",
+    shuffle = false
   }) {
     this.reset();
     this.quizId = quizId;
     this.label = label;
     this.studyMode = mode;
+    this.shuffle = Boolean(shuffle);
     this.exam = exam || null;
     this.remainingTimer = timerSeconds;
     this.startTime = Date.now();
     const isExam = !!this.exam || mode === "exam";
 
-    const baseQuestions = isExam ? [...questions] : shuffleArray([...questions]);
-    this.questions = baseQuestions.map((q) => prepareQuestion(q, isExam));
+    const baseQuestions = this.shuffle ? shuffleArray([...questions]) : [...questions];
+    this.questions = baseQuestions.map((q) => prepareQuestion(q, isExam, this.shuffle));
     this.maxPoints = this.questions.reduce((sum, q) => sum + (q.points || 0), 0);
     return this;
   }
@@ -619,6 +622,7 @@ export class QuizEngine {
     this.quizId = quizId || null;
     this.label = label || "";
     this.studyMode = studyMode || "practice";
+    this.shuffle = Boolean(session.shuffle);
     this.questions = questions;
     this.index = Math.min(index, Math.max(questions.length - 1, 0));
     this.score = score || 0;
@@ -641,6 +645,7 @@ export class QuizEngine {
       quizId: this.quizId,
       label: this.label,
       studyMode: this.studyMode,
+      shuffle: this.shuffle,
       questions: this.questions,
       index: this.index,
       score: this.score,

@@ -7,3 +7,4 @@ dev-dist
 firebase-debug.log
 *.log
 .DS_Store
+scratch/

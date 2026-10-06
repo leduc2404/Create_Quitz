@@ -17,6 +17,7 @@ import {
 } from "../util.js";
 import { perf } from "../../core/perf.js";
 import { fmtScore } from "../../core/exam-config.js";
+import { getQuestionType } from "../../core/quiz-parser.js";
 import {
   playCorrectSound,
   playWrongSound,
@@ -1144,18 +1145,7 @@ const TYPE_LABELS = {
 };
 
 function questionType(question) {
-  if (!question) return "multiple_choice";
-  if (question.type && question.type !== "mixed") return question.type;
-  if (Array.isArray(question.items) && question.items.length > 0) return "true_false";
-  if (Array.isArray(question.options) && question.options.length > 0) return "multiple_choice";
-  if (
-    (Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0) ||
-    question.tolerance != null ||
-    /^-?\d+([.,]\d+)?$/.test(String(question.answer || "").trim())
-  ) {
-    return "short_answer";
-  }
-  return "essay";
+  return getQuestionType(question);
 }
 
 function showNextCta() {
