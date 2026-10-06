@@ -1,12 +1,13 @@
-// Màn hình kết quả — điểm (thang 10 cho đề THPT 2026), review câu sai, retry, chia sẻ.
 import { engine } from "../../core/quiz-engine.js";
-import { recordWrongIds } from "../../core/storage/local.js";
+import { recordWrongIds, saveAttempt } from "../../core/storage/local.js";
 import { saveResult } from "../../core/storage/cloud.js";
 import { getState, getQuiz } from "../../core/store.js";
 import { shareQuiz } from "../../core/share.js";
 import { fmtScore } from "../../core/exam-config.js";
-import { iconSvg } from "../icons.js";
+import { iconSvg, hydrateIcons } from "../icons.js";
 import { showScreen } from "../router.js";
+import { launchConfetti } from "../confetti.js";
+import { formatRichText } from "../util.js";
 
 const TYPE_LABELS = {
   multiple_choice: "Trắc nghiệm",
@@ -62,6 +63,51 @@ export function showResult() {
   document.getElementById("resultTitle").textContent = title;
   document.getElementById("resultMessage").textContent = message;
 
+  // Hiệu ứng pháo hoa chúc mừng nếu đạt điểm giỏi (>= 80% hoặc >= 8.0)
+  if (percentage >= 80 || (fullExam && score >= 8.0)) {
+    launchConfetti(4500);
+  }
+
+  // Khảo thí EdTech: Nhịp độ làm bài (Pacing)
+  const totalSeconds =
+    engine.analytics?.totalSeconds ??
+    Math.max(1, Math.floor((Date.now() - engine.startTime) / 1000));
+  const avgPace =
+    engine.analytics?.avgSecondsPerQ ??
+    Math.round(totalSeconds / Math.max(1, engine.total));
+
+  const pacingCard = document.getElementById("pacingCard");
+  if (pacingCard) {
+    pacingCard.hidden = false;
+    document.getElementById("avgPaceVal").textContent = `${avgPace}s`;
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    document.getElementById("totalTimeVal").textContent = `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+
+    let paceEval = "Tối ưu 🎯";
+    if (avgPace <= 25) paceEval = "Nhanh ⚡";
+    else if (avgPace > 75) paceEval = "Cần tăng tốc ⏳";
+    document.getElementById("paceEvalVal").textContent = paceEval;
+  }
+
+  // Khảo thí EdTech: Năng lực theo từng phần thi / chủ đề
+  renderTopicBreakdown();
+
+  // Lưu lịch sử bài thi (Attempt History)
+  saveAttempt({
+    quizId: engine.quizId,
+    quizName: engine.label || "Bài kiểm tra",
+    studyMode: engine.studyMode || "practice",
+    score,
+    total,
+    percentage: Math.round(percentage),
+    totalSeconds,
+    avgPace,
+    wrongCount: engine.wrongAnswers.length,
+    totalQuestions: engine.total
+  });
+
   renderExamSections(isExam);
   renderWrongAnswers();
   renderSolutionList(isExam);
@@ -81,8 +127,78 @@ export function showResult() {
   // Chỉ hiện nút share khi phiên này thuộc về một quiz trong thư viện
   document.getElementById("shareResultBtn").hidden = !getQuiz(engine.quizId);
 
+  hydrateIcons();
   showScreen("resultScreen");
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ---------- Khảo thí: Năng lực theo chủ đề / phần thi ----------
+function renderTopicBreakdown() {
+  const card = document.getElementById("topicBreakdownCard");
+  const container = document.getElementById("topicBars");
+  if (!card || !container) return;
+
+  const stats = {};
+  engine.questions.forEach((q, idx) => {
+    const key = q.topic || q.part || "Chung";
+    if (!stats[key]) {
+      stats[key] = { name: key, total: 0, correct: 0, earned: 0, maxPoints: 0 };
+    }
+    stats[key].total++;
+    stats[key].maxPoints += (q.points || 1);
+
+    const res = engine.results[idx] || (engine.userAnswers[idx]?.ok ? { ok: true, earned: q.points || 1 } : null);
+    if (res) {
+      if (res.ok) stats[key].correct++;
+      stats[key].earned += (res.earned || 0);
+    }
+  });
+
+  const entries = Object.values(stats);
+  if (entries.length === 0) {
+    card.hidden = true;
+    return;
+  }
+
+  container.innerHTML = "";
+  entries.forEach((item) => {
+    const pct = item.maxPoints > 0
+      ? Math.round((item.earned / item.maxPoints) * 100)
+      : Math.round((item.correct / item.total) * 100);
+
+    const row = document.createElement("div");
+    row.className = "topic-bar-row";
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "topic-bar-label";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = item.name;
+
+    const scoreSpan = document.createElement("span");
+    scoreSpan.className = "muted";
+    scoreSpan.textContent = `${item.correct}/${item.total} câu · ${pct}%`;
+
+    labelRow.append(nameSpan, scoreSpan);
+
+    const bg = document.createElement("div");
+    bg.className = "topic-bar-bg";
+
+    const fill = document.createElement("div");
+    fill.className = "topic-bar-fill";
+    fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    if (pct >= 80) {
+      fill.style.background = "linear-gradient(90deg, #10B981, #06B6D4)";
+    } else if (pct < 50) {
+      fill.style.background = "linear-gradient(90deg, #F43F5E, #FB923C)";
+    }
+
+    bg.appendChild(fill);
+    row.append(labelRow, bg);
+    container.appendChild(row);
+  });
+
+  card.hidden = false;
 }
 
 // ---------- Đề THPT 2026: cảnh báo trích đoạn + bảng điểm ----------
@@ -181,7 +297,7 @@ function renderSolutionList(isExam) {
 
     const question = document.createElement("div");
     question.className = "question";
-    question.textContent = q.question;
+    question.innerHTML = formatRichText(q.question);
     div.append(label, question);
 
     const answer = document.createElement("div");
@@ -231,7 +347,7 @@ function renderSolutionList(isExam) {
       sol.appendChild(solLabel);
       const content = document.createElement("div");
       content.className = "solution-content";
-      content.textContent = q.explanation;
+      content.innerHTML = formatRichText(q.explanation);
       sol.appendChild(content);
       div.appendChild(sol);
     }
@@ -266,7 +382,7 @@ function renderWrongAnswers() {
 
       const q = document.createElement("div");
       q.className = "question";
-      q.textContent = item.question;
+      q.innerHTML = formatRichText(item.question);
       div.append(label, q);
 
       const yours = document.createElement("div");
@@ -297,6 +413,20 @@ function renderWrongAnswers() {
         pts.className = "solution-pts";
         pts.textContent = `Điểm: +${fmtScore(item.pointsEarned)} / ${fmtScore(item.points)}`;
         div.appendChild(pts);
+      }
+
+      if (item.explanation) {
+        const sol = document.createElement("div");
+        sol.className = "solution-explain";
+        const solLabel = document.createElement("div");
+        solLabel.className = "answer-label";
+        solLabel.textContent = "Lời giải chi tiết:";
+        sol.appendChild(solLabel);
+        const content = document.createElement("div");
+        content.className = "solution-content";
+        content.innerHTML = formatRichText(item.explanation);
+        sol.appendChild(content);
+        div.appendChild(sol);
       }
 
       list.appendChild(div);

@@ -1,7 +1,7 @@
 // Tab Home — greeting, Quick Start card duy nhất, quick actions + stats.
 import { getState, subscribe, unsyncedQuizzes, updateQuiz } from "../../core/store.js";
 import { saveQuizToCloud } from "../../core/storage/cloud.js";
-import { loadSession, clearSession } from "../../core/storage/local.js";
+import { loadSession, clearSession, getStudyStats } from "../../core/storage/local.js";
 import { dueEntries } from "../../core/srs.js";
 import { importantCount } from "../../core/flags.js";
 import { showTab } from "../router.js";
@@ -38,6 +38,16 @@ export function initHomeView({ onResumeSession, onReviewDue, onImportant, onQuic
   document.getElementById("reviewDueBtn").addEventListener("click", onReviewDue);
   document.getElementById("importantBtn").addEventListener("click", onImportant);
 
+  document.getElementById("streakBtn")?.addEventListener("click", () => {
+    const { streak, todayCount } = getStudyStats();
+    toast(
+      streak > 0
+        ? `🔥 Chuỗi ${streak} ngày học liên tục! Hôm nay đã ôn ${todayCount} câu.`
+        : `Hôm nay bạn đã ôn ${todayCount} câu. Hãy tiếp tục ôn tập để tích lũy chuỗi nhé!`,
+      { duration: 2500 }
+    );
+  });
+
   setupResumeBanner(onResumeSession);
   setupSyncBanner();
 
@@ -52,6 +62,18 @@ export function initHomeView({ onResumeSession, onReviewDue, onImportant, onQuic
 export function renderStats() {
   const due = dueEntries().length;
   const flagged = importantCount();
+  const { streak, todayCount } = getStudyStats();
+
+  const streakPill = document.getElementById("streakPill");
+  if (streakPill) {
+    if (streak > 0) {
+      streakPill.textContent = `${streak} ngày (${todayCount} câu)`;
+    } else if (todayCount > 0) {
+      streakPill.textContent = `${todayCount} câu hôm nay`;
+    } else {
+      streakPill.textContent = `Bắt đầu chuỗi`;
+    }
+  }
 
   const dueBtn = document.getElementById("reviewDueBtn");
   dueBtn.hidden = due === 0;

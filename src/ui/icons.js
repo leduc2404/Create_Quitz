@@ -48,7 +48,20 @@ import {
   Smartphone,
   Flame,
   Target,
-  CalendarDays
+  CalendarDays,
+  LayoutGrid,
+  Volume2,
+  VolumeX,
+  ChevronLeft,
+  Search,
+  Highlighter,
+  PenTool,
+  Flag,
+  Maximize2,
+  Minimize2,
+  BarChart3,
+  Clock,
+  Layers
 } from "lucide";
 export const ICONS = {
   Home,
@@ -99,7 +112,20 @@ export const ICONS = {
   CalendarDays,
   FolderOpen,
   ClipboardPaste,
-  Smartphone
+  Smartphone,
+  LayoutGrid,
+  Volume2,
+  VolumeX,
+  ChevronLeft,
+  Search,
+  Highlighter,
+  PenTool,
+  Flag,
+  Maximize2,
+  Minimize2,
+  BarChart3,
+  Clock,
+  Layers
 };
 
 /** IconNode → chuỗi SVG (stroke currentColor, outline) */

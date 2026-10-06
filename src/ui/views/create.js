@@ -1,5 +1,5 @@
-// Tab Create — dán/file JSON → modal đặt tên + chọn icon + cài timer.
-import { parseQuizData } from "../../core/quiz-parser.js";
+// Tab Create — dán/file JSON hoặc văn bản thuần (Word/PDF) → modal đặt tên + chọn icon + cài timer.
+import { parseQuizData, parseRawTextQuiz } from "../../core/quiz-parser.js";
 import { addQuiz } from "../../core/store.js";
 import { genId } from "../../core/storage/local.js";
 import { iconSvg } from "../icons.js";
@@ -8,7 +8,7 @@ import { toast, toastError, toastSuccess } from "../toast.js";
 
 export const ICON_OPTIONS = [
   "BookOpen", "Brain", "FlaskConical", "Languages", "Calculator", "History",
-  "Music", "Code", "HeartPulse", "Globe", "GraduationCap", "PenLine"
+  "Music", "Code", "HeartPulse", "Globe", "GraduationCap", "PenLine", "Layers"
 ];
 
 // Trạng thái modal tạo bộ đề
@@ -24,10 +24,10 @@ export function initCreateView() {
   document.getElementById("importPasteBtn").addEventListener("click", () => {
     const text = textarea.value.trim();
     if (!text) {
-      toastError("Vui lòng dán nội dung JSON vào ô nhập liệu!");
+      toastError("Vui lòng dán nội dung JSON hoặc văn bản câu hỏi vào ô nhập liệu!");
       return;
     }
-    tryParseAndOpen(JSON.parse.bind(null, text), nextName());
+    tryParseTextAndOpen(text, nextName());
   });
 
   setupFileInput();
@@ -56,19 +56,34 @@ function nextName() {
   return "Bộ đề mới";
 }
 
-function tryParseAndOpen(parseFn, suggestedName) {
-  let data;
+function tryParseTextAndOpen(rawText, suggestedName) {
+  if (!rawText || !rawText.trim()) {
+    toastError("Vui lòng dán nội dung vào ô nhập liệu!");
+    return;
+  }
+
+  const text = rawText.trim();
+  let parsed = null;
+
+  // Thử parse JSON trước
   try {
-    data = parseFn();
-  } catch (error) {
-    toastError(`JSON không hợp lệ: ${error.message}`);
-    return;
+    const data = JSON.parse(text);
+    parsed = parseQuizData(data, suggestedName);
+  } catch {
+    // Nếu không phải JSON hợp lệ -> kích hoạt Universal Smart Raw Text Parser
+    parsed = parseRawTextQuiz(text, suggestedName);
   }
-  const parsed = parseQuizData(data, suggestedName);
+
+  if (!parsed && !text.startsWith("{") && !text.startsWith("[")) {
+    parsed = parseRawTextQuiz(text, suggestedName);
+  }
+
   if (!parsed) {
-    toastError("Không tìm thấy câu hỏi. Kiểm tra lại định dạng JSON.");
+    toastError("Không tìm thấy câu hỏi. Hãy kiểm tra lại định dạng JSON hoặc văn bản trắc nghiệm.");
     return;
   }
+
+  toastSuccess(`Đã nhận diện thành công ${parsed.questions.length} câu hỏi!`);
   openCreateModal(parsed);
 }
 
@@ -95,19 +110,26 @@ function setupFileInput() {
 
 async function handleFiles(files) {
   for (const file of files) {
-    if (file.type === "application/json" || file.name.endsWith(".json")) {
+    try {
+      const text = await file.text();
+      const baseName = file.name.replace(/\.(json|txt|md)$/i, "");
+      let parsed = null;
+
       try {
-        const text = await file.text();
         const data = JSON.parse(text);
-        const parsed = parseQuizData(data, file.name.replace(/\.json$/i, ""));
-        if (!parsed) {
-          toastError(`Không tìm thấy câu hỏi trong ${file.name}.`);
-          continue;
-        }
-        openCreateModal(parsed);
-      } catch (error) {
-        toastError(`Lỗi đọc file ${file.name}: ${error.message}`);
+        parsed = parseQuizData(data, baseName);
+      } catch {
+        parsed = parseRawTextQuiz(text, baseName);
       }
+
+      if (!parsed) {
+        toastError(`Không tìm thấy câu hỏi trong ${file.name}.`);
+        continue;
+      }
+      toastSuccess(`Đã nhận diện ${parsed.questions.length} câu hỏi từ "${file.name}".`);
+      openCreateModal(parsed);
+    } catch (error) {
+      toastError(`Lỗi đọc file ${file.name}: ${error.message}`);
     }
   }
 }
@@ -121,13 +143,16 @@ function setupGlobalPaste() {
 
     const pastedText = e.clipboardData.getData("text");
     if (!pastedText || !pastedText.trim()) return;
-    tryParseAndOpen(JSON.parse.bind(null, pastedText), nextName());
+    tryParseTextAndOpen(pastedText, nextName());
   });
 }
 
 // ---------- Modal "Bộ đề mới" ----------
 function defaultIconFor(parsed) {
   if (parsed.quizType === "thpt2026") return "GraduationCap";
+  if (parsed.quizType === "mixed") return "Layers";
+  if (parsed.quizType === "short_answer") return "Brain";
+  if (parsed.quizType === "flashcard") return "Brain";
   return parsed.quizType === "essay" ? "PenLine" : "ListChecks";
 }
 
@@ -289,37 +314,55 @@ function setupAiModal() {
     if (e.target === modal) modal.classList.remove("open");
   });
 
+  const PROMPT_MAP = {
+    master: { contentId: "promptMaster", boxId: "promptBoxMaster", btnTextId: "copyBtnTextMaster" },
+    thpt2026: { contentId: "promptThpt2026", boxId: "promptBoxThpt", btnTextId: "copyBtnTextTHPT" },
+    tn_ngan: { contentId: "promptTnNgan", boxId: "promptBoxTnNgan", btnTextId: "copyBtnTextTnNgan" },
+    tn_ngan_tuluan: { contentId: "promptTnNganTuLuan", boxId: "promptBoxTnNganTuLuan", btnTextId: "copyBtnTextTnNganTuLuan" },
+    tienganh: { contentId: "promptTiengAnh", boxId: "promptBoxTiengAnh", btnTextId: "copyBtnTextTiengAnh" },
+    tracnghiem: { contentId: "promptTracNghiem", boxId: "promptBox", btnTextId: "copyBtnTextTN" },
+    flashcard: { contentId: "promptFlashcard", boxId: "promptBoxFlashcard", btnTextId: "copyBtnTextFC" }
+  };
+
   document.querySelectorAll("#promptSeg .seg-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const type = btn.dataset.prompt;
       document.querySelectorAll("#promptSeg .seg-btn").forEach((b) =>
         b.classList.toggle("active", b === btn)
       );
-      document.getElementById("promptTracNghiem").classList.toggle("active", type === "tracnghiem");
-      document.getElementById("promptTuLuan").classList.toggle("active", type === "tuluan");
-      document.getElementById("promptThpt2026").classList.toggle("active", type === "thpt2026");
+      Object.entries(PROMPT_MAP).forEach(([key, cfg]) => {
+        const el = document.getElementById(cfg.contentId);
+        if (el) el.classList.toggle("active", key === type);
+      });
     });
   });
 
-  document.getElementById("copyBtnTN").addEventListener("click", () => copyPrompt("tracnghiem"));
-  document.getElementById("copyBtnTL").addEventListener("click", () => copyPrompt("tuluan"));
-  document.getElementById("copyBtnTHPT").addEventListener("click", () => copyPrompt("thpt2026"));
+  document.getElementById("copyBtnMaster")?.addEventListener("click", () => copyPrompt("master", PROMPT_MAP));
+  document.getElementById("copyBtnTHPT")?.addEventListener("click", () => copyPrompt("thpt2026", PROMPT_MAP));
+  document.getElementById("copyBtnTnNgan")?.addEventListener("click", () => copyPrompt("tn_ngan", PROMPT_MAP));
+  document.getElementById("copyBtnTnNganTuLuan")?.addEventListener("click", () => copyPrompt("tn_ngan_tuluan", PROMPT_MAP));
+  document.getElementById("copyBtnTiengAnh")?.addEventListener("click", () => copyPrompt("tienganh", PROMPT_MAP));
+  document.getElementById("copyBtnTN")?.addEventListener("click", () => copyPrompt("tracnghiem", PROMPT_MAP));
+  document.getElementById("copyBtnFC")?.addEventListener("click", () => copyPrompt("flashcard", PROMPT_MAP));
 }
 
-function copyPrompt(type) {
-  const boxId =
-    type === "tuluan" ? "promptBoxEssay" : type === "thpt2026" ? "promptBoxThpt" : "promptBox";
-  const btnText = document.getElementById(
-    type === "tuluan" ? "copyBtnTextTL" : type === "thpt2026" ? "copyBtnTextTHPT" : "copyBtnTextTN"
-  );
-  const promptText = document.getElementById(boxId).textContent;
+function copyPrompt(type, map) {
+  const cfg = map[type];
+  if (!cfg) return;
+  const box = document.getElementById(cfg.boxId);
+  const btnText = document.getElementById(cfg.btnTextId);
+  if (!box) return;
 
+  const promptText = box.textContent;
   navigator.clipboard
     .writeText(promptText)
     .then(() => {
-      const original = btnText.textContent;
-      btnText.textContent = "Đã copy!";
-      setTimeout(() => (btnText.textContent = original), 2000);
+      if (btnText) {
+        const original = btnText.textContent;
+        btnText.textContent = "Đã copy!";
+        setTimeout(() => (btnText.textContent = original), 2000);
+      }
+      toastSuccess("Đã sao chép prompt AI vào Clipboard.");
     })
     .catch(() => toastError("Không thể copy tự động. Hãy bôi đen và copy thủ công."));
 }

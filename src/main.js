@@ -1,5 +1,6 @@
 // Bootstrap app: khởi tạo store, 4 tab + overlays, auth, PWA.
 import "./styles/styles.css";
+import { perf } from "./core/perf.js";
 import { registerSW } from "virtual:pwa-register";
 import { initQuizzes, getState } from "./core/store.js";
 import { engine, shuffleArray } from "./core/quiz-engine.js";
@@ -21,7 +22,6 @@ import { initResultView, showResult } from "./ui/views/result.js";
 import { initAuthUI, syncAfterLogin } from "./auth/auth-ui.js";
 import { watchAuth } from "./auth/auth.js";
 import { initInstallPrompt } from "./pwa/install.js";
-import { initOnboarding } from "./ui/onboarding.js";
 
 // ---- Service worker: autoUpdate — bản mới tự kích hoạt khi tải lại ----
 registerSW({
@@ -39,18 +39,14 @@ hydrateIcons();
 // Context của phiên quiz gần nhất (phục vụ "Làm lại")
 let lastStart = null;
 
-function beginQuiz(quiz, questions, label) {
-  lastStart = { quiz, questions, label };
-  engine.start({ quizId: quiz?.id ?? null, label, questions, exam: quiz?.exam || null });
+function beginQuiz(quiz, questions, label, mode = "practice") {
+  lastStart = { quiz, questions, label, mode };
+  engine.start({ quizId: quiz?.id ?? null, label, questions, exam: quiz?.exam || null, mode });
   enterQuizScreen();
 }
 
 function startQuizFlow(quiz) {
-  if (quiz.topics && quiz.topics.length > 1) {
-    showTopicSelection(quiz);
-  } else {
-    beginQuiz(quiz, quiz.questions, quiz.fileName);
-  }
+  showTopicSelection(quiz);
 }
 
 /** Gom câu hỏi từ tất cả quiz, gắn srsKey để SRS theo dõi được */
@@ -106,19 +102,22 @@ initCreateView();
 initProfileView();
 
 initTopicsView({
-  onAllTopics: (quiz, limit) => {
+  onAllTopics: (quiz, limit, mode) => {
     const questions = limit
       ? shuffleArray([...quiz.questions]).slice(0, limit)
       : quiz.questions;
     beginQuiz(
       quiz,
       questions,
-      limit ? `${quiz.fileName} — ${questions.length} câu` : quiz.fileName
+      limit ? `${quiz.fileName} — ${questions.length} câu` : quiz.fileName,
+      mode
     );
   },
-  onSelectTopic: (quiz, topicIndex) => {
-    const topic = quiz.topics[topicIndex];
-    beginQuiz(quiz, topic.questions, `${quiz.fileName} — ${topic.topic}`);
+  onSelectTopic: (quiz, topicIndex, mode) => {
+    const topic = quiz.topics ? quiz.topics[topicIndex] : null;
+    const questions = topic ? topic.questions : quiz.questions;
+    const label = topic ? `${quiz.fileName} — ${topic.topic}` : quiz.fileName;
+    beginQuiz(quiz, questions, label, mode);
   },
   onBack: () => showTab("libraryScreen")
 });
@@ -137,7 +136,7 @@ initQuizView({
 
 initResultView({
   onRestart: () => {
-    if (lastStart) beginQuiz(lastStart.quiz, lastStart.questions, lastStart.label);
+    if (lastStart) beginQuiz(lastStart.quiz, lastStart.questions, lastStart.label, lastStart.mode);
   },
   onRetryWrong: () => {
     const wrongQuestions = engine.wrongAnswers.map((w) => ({
@@ -198,6 +197,5 @@ watchAuth((user) => {
   if (user) syncAfterLogin(user);
 });
 initInstallPrompt();
-initOnboarding();
 
 showTab("homeScreen");

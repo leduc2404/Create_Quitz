@@ -1,4 +1,4 @@
-// Tab Library — danh sách quiz tối giản: icon + tên + số câu + menu "...".
+// Tab Library — danh sách quiz tối giản: icon + tên + số câu + menu "...", tìm kiếm & lọc thẻ.
 import { getState, removeQuiz, subscribe, updateQuiz } from "../../core/store.js";
 import { isCloudAvailable, saveQuizToCloud, deleteCloudQuiz } from "../../core/storage/cloud.js";
 import { shareQuiz } from "../../core/share.js";
@@ -8,10 +8,38 @@ import { showTab } from "../router.js";
 import { confirmDialog, promptDialog } from "../confirm.js";
 import { toast, toastError, toastSuccess } from "../toast.js";
 
+let currentSearch = "";
+let currentFilter = "all";
+let startCallback = null;
+
 export function initLibraryView({ onStart }) {
+  startCallback = onStart;
+
   document.getElementById("emptyCreateBtn").addEventListener("click", () => {
     showTab("createScreen");
   });
+
+  // Tìm kiếm tức thì
+  const searchInput = document.getElementById("librarySearch");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      currentSearch = e.target.value.toLowerCase().trim();
+      renderLibrary(startCallback);
+    });
+  }
+
+  // Bộ lọc thẻ
+  const filterChips = document.getElementById("libraryFilters");
+  if (filterChips) {
+    filterChips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".filter-chip");
+      if (!chip) return;
+      filterChips.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      currentFilter = chip.dataset.filter || "all";
+      renderLibrary(startCallback);
+    });
+  }
 
   subscribe("quizzes", () => renderLibrary(onStart));
   renderLibrary(onStart);
@@ -20,20 +48,41 @@ export function initLibraryView({ onStart }) {
 function defaultIcon(quiz) {
   if (quiz.settings && quiz.settings.icon) return quiz.settings.icon;
   if (quiz.quizType === "thpt2026") return "GraduationCap";
+  if (quiz.quizType === "mixed") return "Layers";
+  if (quiz.quizType === "short_answer") return "Brain";
+  if (quiz.quizType === "flashcard") return "Brain";
   return quiz.quizType === "essay" ? "PenLine" : "ListChecks";
 }
 
 function renderLibrary(onStart) {
-  const quizzes = getState().quizzes;
+  const allQuizzes = getState().quizzes;
   const list = document.getElementById("filesList");
   const emptyState = document.getElementById("emptyState");
 
+  // Lọc theo từ khóa tìm kiếm và loại đề
+  const filtered = allQuizzes.filter((quiz) => {
+    // 1. Lọc theo search
+    if (currentSearch) {
+      const name = (quiz.fileName || "").toLowerCase();
+      const topic = (quiz.mainTopic || "").toLowerCase();
+      if (!name.includes(currentSearch) && !topic.includes(currentSearch)) {
+        return false;
+      }
+    }
+    // 2. Lọc theo loại
+    if (currentFilter !== "all") {
+      if (quiz.quizType !== currentFilter) return false;
+    }
+    return true;
+  });
+
   document.getElementById("libraryCount").textContent =
-    quizzes.length > 0 ? `${quizzes.length} bộ đề` : "";
-  emptyState.hidden = quizzes.length > 0;
+    allQuizzes.length > 0 ? `${filtered.length}/${allQuizzes.length} bộ đề` : "";
+
+  emptyState.hidden = filtered.length > 0;
   list.innerHTML = "";
 
-  quizzes.forEach((quiz) => {
+  filtered.forEach((quiz) => {
     const row = document.createElement("div");
     row.className = "quiz-row";
     row.setAttribute("role", "button");
@@ -52,7 +101,19 @@ function renderLibrary(onStart) {
 
     const sub = document.createElement("div");
     sub.className = "quiz-row-sub";
-    sub.textContent = `${quiz.totalQuestions} câu · ${quiz.quizType === "essay" ? "Tự luận" : quiz.quizType === "thpt2026" ? "Đề THPT 2026" : "Trắc nghiệm"}`;
+    const typeLabel =
+      quiz.quizType === "essay"
+        ? "Tự luận"
+        : quiz.quizType === "thpt2026"
+        ? "Đề THPT 2026"
+        : quiz.quizType === "mixed"
+        ? "Tổng hợp"
+        : quiz.quizType === "short_answer"
+        ? "Trả lời ngắn"
+        : quiz.quizType === "flashcard"
+        ? "Flashcard"
+        : "Trắc nghiệm";
+    sub.textContent = `${quiz.totalQuestions} câu · ${typeLabel}`;
 
     info.append(name, sub);
 
@@ -83,7 +144,11 @@ function openQuizSheet(quiz, onStart) {
     { icon: "Play", label: "Bắt đầu", onClick: () => onStart(quiz) },
     { icon: "Share2", label: "Chia sẻ bằng link", onClick: () => shareQuiz(quiz) },
     { icon: "PenLine", label: "Đổi tên", onClick: () => renameQuiz(quiz) },
-    { icon: "CloudUpload", label: quiz.cloudId ? "Đã lưu cloud — cập nhật" : "Lưu lên cloud", onClick: () => syncOne(quiz) },
+    {
+      icon: "CloudUpload",
+      label: quiz.cloudId ? "Đã lưu cloud — cập nhật" : "Lưu lên cloud",
+      onClick: () => syncOne(quiz)
+    },
     { icon: "Download", label: "Xuất JSON", onClick: () => exportQuiz(quiz) },
     { icon: "Trash2", label: "Xóa bộ đề", danger: true, onClick: () => deleteQuiz(quiz) }
   ];

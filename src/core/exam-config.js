@@ -147,11 +147,60 @@ export function normalizeNumericAnswer(text) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Chuẩn hóa chuỗi văn bản để so khớp: gọt dấu câu, khoảng trắng thừa, chữ thường */
+export function normalizeTextAnswer(str = "") {
+  return String(str || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+/** So sánh đáp án ngắn / điền khuyết đa năng (hỗ trợ cả chữ, số, danh sách đáp án chấp nhận, sai số tolerance) */
+export function matchShortAnswer(correctAnswer, userAnswer, options = {}) {
+  if (userAnswer == null || userAnswer === "") return false;
+
+  const tolerance = Number(options.tolerance) || 0;
+  const acceptable = Array.isArray(options.acceptableAnswers)
+    ? options.acceptableAnswers
+    : Array.isArray(options.acceptable)
+      ? options.acceptable
+      : [];
+
+  const targets = [correctAnswer, ...acceptable].filter((v) => v != null && v !== "");
+  if (targets.length === 0) return false;
+
+  const uNum = normalizeNumericAnswer(userAnswer);
+  const uNorm = normalizeTextAnswer(userAnswer);
+
+  for (const target of targets) {
+    // 1. So khớp số học nếu cả 2 đều là số
+    const tNum = normalizeNumericAnswer(target);
+    if (uNum !== null && tNum !== null) {
+      if (Math.abs(uNum - tNum) <= Math.max(1e-9, tolerance)) {
+        return true;
+      }
+    }
+
+    // 2. So khớp chuỗi văn bản thông minh (không phân biệt hoa thường, dấu câu, khoảng trắng)
+    const tNorm = normalizeTextAnswer(target);
+    if (uNorm && tNorm && uNorm === tNorm) {
+      return true;
+    }
+
+    // 3. So khớp không dấu tiếng Việt (ví dụ học sinh gõ 'ha noi' cho 'hà nội')
+    const tNonAccent = tNorm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+    const uNonAccent = uNorm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+    if (uNonAccent && tNonAccent && uNonAccent === tNonAccent) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function numericAnswersEqual(a, b) {
-  const na = normalizeNumericAnswer(a);
-  const nb = normalizeNumericAnswer(b);
-  if (na == null || nb == null) return false;
-  return Math.abs(na - nb) < 1e-9;
+  return matchShortAnswer(a, b);
 }
 
 /** Điểm mặc định cho từng loại câu khi không xác định được môn */
