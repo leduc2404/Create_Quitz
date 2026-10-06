@@ -443,9 +443,19 @@ function renderPassageAndPrompt(question) {
   }
 }
 
-// ---------- Trắc nghiệm 4 lựa chọn (Hỗ trợ cả Practice & Exam Mode) ----------
+// ---------- Trắc nghiệm 4 lựa chọn & Đúng/Sai 2 lựa chọn (Practice & Exam Mode) ----------
 function renderMultipleChoice(container, question, isExam = false) {
   const currentAnswer = engine.userAnswers[engine.index];
+
+  const isBinaryTf =
+    question.options.length === 2 &&
+    question.options.some((o) => /đúng|true/i.test(o)) &&
+    question.options.some((o) => /sai|false/i.test(o));
+  if (isBinaryTf) {
+    container.classList.add("binary-tf-container");
+  } else {
+    container.classList.remove("binary-tf-container");
+  }
 
   question.options.forEach((option, idx) => {
     const cleaned = cleanOptionPrefix(option);
@@ -453,6 +463,10 @@ function renderMultipleChoice(container, question, isExam = false) {
 
     const btn = document.createElement("button");
     btn.className = "option-btn";
+    if (isBinaryTf) {
+      const isTrueOpt = /đúng|true/i.test(cleaned.text || option);
+      btn.classList.add(isTrueOpt ? "btn-binary-true" : "btn-binary-false");
+    }
     btn.type = "button";
 
     const keySpan = document.createElement("span");

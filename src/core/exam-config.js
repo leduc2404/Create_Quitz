@@ -174,10 +174,17 @@ export function matchShortAnswer(correctAnswer, userAnswer, options = {}) {
   const uNorm = normalizeTextAnswer(userAnswer);
 
   for (const target of targets) {
-    // 1. So khớp số học nếu cả 2 đều là số
+    // 1. So khớp số học nếu cả 2 đều là số (hỗ trợ cả phần trăm: 90% vs 0.9)
     const tNum = normalizeNumericAnswer(target);
     if (uNum !== null && tNum !== null) {
       if (Math.abs(uNum - tNum) <= Math.max(1e-9, tolerance)) {
+        return true;
+      }
+      // Hỗ trợ tỷ lệ phần trăm: VD 90% (90) vs 0.9, hoặc 0.81 vs 81%
+      if (
+        Math.abs(uNum * 100 - tNum) <= Math.max(1e-4, tolerance) ||
+        Math.abs(uNum - tNum * 100) <= Math.max(1e-4, tolerance)
+      ) {
         return true;
       }
     }
@@ -188,11 +195,18 @@ export function matchShortAnswer(correctAnswer, userAnswer, options = {}) {
       return true;
     }
 
-    // 3. So khớp không dấu tiếng Việt (ví dụ học sinh gõ 'ha noi' cho 'hà nội')
+    // 3. So khớp không dấu tiếng Việt (ví dụ học sinh gõ 'tu tuong quan' cho 'tự tương quan')
     const tNonAccent = tNorm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     const uNonAccent = uNorm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     if (uNonAccent && tNonAccent && uNonAccent === tNonAccent) {
       return true;
+    }
+
+    // 4. So khớp từ khóa trọng tâm (VD: target "Hiện tượng tự tương quan" vs user "tự tương quan")
+    if (uNonAccent && tNonAccent && uNonAccent.length >= 4) {
+      if (tNonAccent.includes(uNonAccent) || uNonAccent.includes(tNonAccent)) {
+        return true;
+      }
     }
   }
 

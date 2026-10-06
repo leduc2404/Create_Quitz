@@ -2457,4 +2457,35 @@ body.zen-mode .app-main { padding-top: 12px !important; max-width: 960px !import
   opacity: 0.5;
 }
 
+/* ---------- Câu hỏi Đúng / Sai 2 lựa chọn (A. Đúng / B. Sai) ---------- */
+.options.binary-tf-container,
+#optionsContainer.binary-tf-container {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .options.binary-tf-container,
+  #optionsContainer.binary-tf-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+.btn-binary-true {
+  border-left: 4px solid #10B981 !important;
+}
+.btn-binary-true:hover:not(.disabled) {
+  border-color: #10B981 !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+}
+.btn-binary-false {
+  border-left: 4px solid #EF4444 !important;
+}
+.btn-binary-false:hover:not(.disabled) {
+  border-color: #EF4444 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+
 

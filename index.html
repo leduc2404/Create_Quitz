@@ -480,81 +480,103 @@
 
         <!-- 0. Master Prompt Đa Năng — Hợp nhất & Tự động thích ứng mọi thể loại bài -->
         <div class="prompt-content active" id="promptMaster">
-          <pre class="prompt-box" id="promptBoxMaster">Bạn là hệ thống AI sư phạm chuyên gia tạo đề thi khảo thí thông minh toàn diện. Dựa vào nội dung người dùng cung cấp (tài liệu/ảnh/PDF/chủ đề), trong MỘT LẦN SINH DUY NHẤT hãy tạo ra MỘT BỘ ĐỀ TỔNG HỢP KẾT HỢP ĐỒNG THỜI TẤT CẢ CÁC DẠNG BÀI PHÙ HỢP (không chọn duy nhất 1 loại), xuất ra chuẩn MỘT FILE JSON DUY NHẤT theo cấu trúc dưới đây:
+          <pre class="prompt-box" id="promptBoxMaster">Bạn là chuyên gia sư phạm &amp; khảo thí AI hàng đầu, chuyên gia xử lý và chuyển đổi toàn diện mọi tài liệu ôn tập, giáo trình, đề thi (PDF, ảnh chụp, tài liệu scan, Word, văn bản) thành định dạng JSON làm bài thi thông minh.
 
+Dựa vào tài liệu người dùng cung cấp (ví dụ: tài liệu ôn tập nhiều chương, nhiều dạng bài), trong MỘT LẦN SINH hãy tạo ra MỘT FILE JSON DUY NHẤT theo các quy tắc khắt khe sau:
+
+1. QUÉT VÀ TRÍCH XUẤT 100% TẤT CẢ CÂU HỎI TRONG TÀI LIỆU:
+- Quét toàn bộ mọi trang, mọi chương/phần (ví dụ từ Chương 1 đến Chương 7).
+- TUYỆT ĐỐI KHÔNG BỎ SÓT, KHÔNG CẮT BỚT, KHÔNG TỰ Ý TÓM TẮT.
+- Chuyển đổi mọi câu hỏi thành một file JSON hoàn chỉnh với cấu trúc "format": "mixed".
+
+2. GIỮ NGUYÊN CẤU TRÚC PHÂN CHƯƠNG &amp; ID DUY NHẤT:
+- Đặt trường "topic" là tên chương tương ứng cho từng câu hỏi (VD: "Chương 1: Những vấn đề chung", "Chương 2: Mô hình đơn", "Chương 4: Hồi quy biến giả"...).
+- Đánh mã ID duy nhất theo chương để không bị trùng lặp số câu: "C1_Q1", "C1_Q2", ..., "C2_Q1", ..., "C7_Q10".
+
+3. NHẬN DIỆN VÀ TỰ GIẢI ĐÁP ÁN:
+- Nếu tài liệu có đáp án được TÔ MÀU VÀNG (highlight), có ký hiệu (Đ), [Đúng], hoặc gạch chân -> Đó là đáp án đúng!
+- Nếu câu hỏi có đáp án hoặc phép tính viết tay / đánh máy kèm theo ở cuối câu (sau dấu "?" hoặc ":", chữ màu xanh/tím, VD: "... bằng bao nhiêu? Bằng 1", "khi đó RSS bằng? 3200", "ESS = ? TSS = RSS + ESS => ESS= 600") -> Bóc tách kết quả làm "answer" và các bước tính làm "explanation".
+- ĐẶC BIỆT: NẾU CÂU HỎI TRONG TÀI LIỆU CHƯA CÓ ĐÁP ÁN SẴN (ví dụ câu hỏi tự luyện ở Chương 6 về kiểm định Durbin-Watson dL &lt;= d &lt;= dU) -> BẠN PHẢI DÙNG KIẾN THỨC CHUYÊN MÔN ĐỂ TỰ ĐIỀN ĐÁP ÁN ĐÚNG CHUẨN XÁC VÀ VIẾT LỜI GIẢI THÍCH CHI TIẾT ("explanation")! Tuyệt đối không để trống đáp án.
+
+4. PHÂN LOẠI CHUẨN XÁC CÁC DẠNG CÂU HỎI:
+- Trắc nghiệm 4 lựa chọn (a, b, c, d):
+  "type": "multiple_choice",
+  "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+  "answer": "A. Phương án đúng",
+  "explanation": "Giải thích chi tiết vì sao đúng."
+
+- Trắc nghiệm Đúng / Sai 2 lựa chọn (a. Đúng, b. Sai):
+  "type": "multiple_choice",
+  "options": ["A. Đúng", "B. Sai"],
+  "answer": "A. Đúng" (hoặc "B. Sai"),
+  "explanation": "Căn cứ lý thuyết khẳng định nhận định là Đúng hay Sai."
+
+- Câu hỏi tính toán / trả lời ngắn / điền số:
+  "type": "short_answer",
+  "answer": "64%", // hoặc số chuẩn: 600, -5, 3200, 1.2
+  "acceptableAnswers": ["64", "0.64"], // các dạng biểu diễn tương đương
+  "explanation": "Công thức và từng bước tính toán chi tiết."
+
+- Câu hỏi lý thuyết mở / nhận định mô hình / tự luận:
+  "type": "short_answer" (nếu câu trả lời ngắn) HOẶC "type": "essay" (nếu câu hỏi yêu cầu giải thích dài/nhiều ý):
+  "answer": "Mô hình có hiện tượng tự tương quan dương bậc 1",
+  "explanation": "Tiêu chuẩn kiểm định và kết luận chi tiết."
+
+5. CÔNG THỨC TOÁN &amp; KÝ HIỆU CHUYÊN NGÀNH:
+- Giữ nguyên công thức và ký hiệu: Yi = β1 + β2Xi + Ui, R^2, ESS, TSS, RSS, dL &lt;= d &lt;= dU, σ^2, v.v.
+
+CẤU TRÚC JSON MẪU:
 {
   "format": "mixed",
-  "topic": "TÊN MÔN HỌC HOẶC CHỦ ĐỀ CHÍNH",
+  "topic": "TÊN MÔN HỌC HOẶC TÀI LIỆU",
   "questions": [
     {
-      "id": "Q1",
+      "id": "C1_Q1",
       "type": "multiple_choice",
-      "topic": "Trắc nghiệm 4 lựa chọn",
-      "question": "Nội dung câu hỏi trắc nghiệm 4 phương án A, B, C, D?",
-      "options": [
-        "A. Phương án A",
-        "B. Phương án B",
-        "C. Phương án C",
-        "D. Phương án D"
-      ],
-      "answer": "A. Phương án A",
-      "explanation": "Lời giải thích chi tiết vì sao phương án này đúng và các phương án khác sai."
+      "topic": "Chương 1: Những vấn đề chung",
+      "question": "Quá trình nghiên cứu Kinh tế lượng có mấy bước?",
+      "options": ["A. 5", "B. 6", "C. 7", "D. 8"],
+      "answer": "B. 6",
+      "explanation": "Quá trình nghiên cứu Kinh tế lượng chuẩn gồm 6 bước: Đặt mô hình, Thu thập số liệu, Ước lượng, Kiểm định, Đánh giá và Dự báo."
     },
     {
-      "id": "Q2",
-      "type": "true_false",
-      "topic": "Đúng - Sai 4 nhận định",
-      "question": "Cho các nhận định/thông tin sau. Hãy xác định tính Đúng hoặc Sai của từng ý:",
-      "items": [
-        { "text": "Nhận định a...", "correct": true },
-        { "text": "Nhận định b...", "correct": false },
-        { "text": "Nhận định c...", "correct": true },
-        { "text": "Nhận định d...", "correct": false }
-      ],
-      "explanation": "Giải thích chi tiết căn cứ đúng/sai cho từng nhận định a, b, c, d."
-    },
-    {
-      "id": "Q3",
+      "id": "C2_Q1",
       "type": "short_answer",
-      "topic": "Trả lời ngắn / Điền số hoặc từ",
-      "question": "Câu hỏi yêu cầu điền kết quả ngắn gọn (từ khóa, thuật ngữ chuyên môn hoặc kết quả tính toán số học)?",
-      "answer": "Đáp án chuẩn",
-      "acceptableAnswers": ["Cách viết khác 1", "Từ đồng nghĩa 2", "12.5", "12,5"],
-      "explanation": "Giải thích chi tiết các bước tính hoặc lý thuyết cốt lõi. (Người học có thể gõ phím HOẶC bấm 'Xem đáp án' để tự đối chiếu &amp; đánh giá)."
+      "topic": "Chương 2: Mô hình đơn",
+      "question": "Hệ số tương quan r = 1 thì hệ số xác định R² bằng bao nhiêu?",
+      "answer": "1",
+      "acceptableAnswers": ["Bằng 1", "1.0", "100%"],
+      "explanation": "Vì R² = r² = 1² = 1 (hay 100%)."
     },
     {
-      "id": "Q4",
-      "type": "essay",
-      "topic": "Tự luận / Lý thuyết mở",
-      "question": "Câu hỏi tự luận yêu cầu phân tích, giải thích cơ chế, chứng minh hoặc trình bày bài giải chi tiết?",
-      "answer": "- Ý 1: Khái niệm hoặc luận điểm chính...\n- Ý 2: Dẫn chứng hoặc các bước phân tích chi tiết...\n- Ý 3: Kết luận / Giải pháp thực tiễn...",
-      "explanation": "Tiêu chí chấm điểm và thang điểm chi tiết cho từng ý."
+      "id": "C2_Q15",
+      "type": "short_answer",
+      "topic": "Chương 2: Mô hình đơn",
+      "question": "Trong mô hình hồi quy có TSS = 900; RSS = 300; ESS = ?",
+      "answer": "600",
+      "acceptableAnswers": ["600.0", "ESS = 600"],
+      "explanation": "Áp dụng công thức TSS = ESS + RSS => ESS = TSS - RSS = 900 - 300 = 600."
     },
     {
-      "id": "Q5",
+      "id": "C4_Q13",
       "type": "multiple_choice",
-      "topic": "Đọc hiểu / Bài tập đục lỗ (nếu có)",
-      "passageTitle": "Tiêu đề bài đọc hoặc đoạn văn (nếu có)",
-      "passage": "Nội dung bài đọc dài hoặc đoạn văn đục lỗ có đánh số (1) _____, (2) _____...",
-      "blankIndex": 1,
-      "question": "Câu hỏi đọc hiểu ngữ liệu HOẶC chọn từ điền vào vị trí (1):",
-      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-      "answer": "A. ...",
-      "explanation": "Trích dẫn dòng/câu trong bài đọc và giải thích ngữ cảnh chi tiết."
+      "topic": "Chương 4: Hồi quy biến giả",
+      "question": "Hệ số góc của biến giả phản ánh mức độ chênh lệch của phạm trù nghiên cứu so với phạm trù cơ sở (so sánh):",
+      "options": ["A. Đúng", "B. Sai"],
+      "answer": "A. Đúng",
+      "explanation": "Hệ số góc của biến giả đo lường sự chênh lệch giá trị trung bình giữa nhóm nhận giá trị 1 và nhóm nhận giá trị 0 (phạm trù cơ sở)."
+    },
+    {
+      "id": "C6_Q8",
+      "type": "short_answer",
+      "topic": "Chương 6: Tự tương quan",
+      "question": "Trong kiểm định Durbin - Watson, khi giá trị thống kê d thỏa mãn: 0 &lt;= d &lt;= dL thì kết luận mô hình như thế nào?",
+      "answer": "Có tự tương quan dương",
+      "acceptableAnswers": ["Tự tương quan dương bậc 1", "Bác bỏ H0, có tự tương quan dương"],
+      "explanation": "Khi 0 &lt;= d &lt;= dL, giá trị d rơi vào miền bác bỏ H0, kết luận mô hình có tự tương quan dương bậc 1."
     }
   ]
-}
-
-QUY TẮC BẮT BUỘC ĐỐI VỚI AI KHI SINH ĐỀ:
-1. ĐA DẠNG HÓA TRONG 1 LẦN SINH: Tạo đồng thời nhiều loại câu hỏi khác nhau ("multiple_choice", "true_false", "short_answer", "essay") trong cùng một mảng "questions". Tuyệt đối KHÔNG chỉ sinh duy nhất 1 loại đơn lẻ.
-2. TÍNH LINH HOẠT VỀ THÀNH PHẦN: Nếu tài liệu thiếu ngữ liệu cho một dạng cụ thể (ví dụ không có bài đọc hoặc không có số liệu tính toán), bạn có thể linh hoạt bỏ qua dạng đó. Hệ thống tự động xử lý và chấm điểm mọi tổ hợp (Trắc nghiệm + TLN; Trắc nghiệm + Tự luận; hoặc đầy đủ cả 4 loại).
-3. ĐỊNH DẠNG "format": Luôn đặt là "mixed" ở cấp gốc JSON.
-4. "multiple_choice": Bắt buộc có mảng "options" (4 lựa chọn A, B, C, D) và "answer".
-5. "true_false": Bắt buộc có mảng "items" gồm các ý nhận định với "text" và "correct": true/false.
-6. "short_answer": "answer" là đáp án chuẩn nhất; "acceptableAnswers" chứa các dạng viết khác, đồng nghĩa hoặc định dạng số (dấu chấm/phẩy).
-7. "essay": "answer" ghi các ý chính theo từng gạch đầu dòng ("- Ý...") và phân cách bằng "\n" để người học dễ lật thẻ tự so sánh.
-8. BÀI ĐỌC DÀI / ĐỤC LỖ: Tích hợp trường "passage" cho toàn bài đọc; nếu là bài đục lỗ thì thêm "blankIndex" (1, 2, 3...).
-9. BẮT BUỘC có trường "explanation" cho MỌI câu hỏi để học sinh xem lời giải chi tiết từng bước sau khi làm.</pre>
+}</pre>
           <button class="ghost-btn" data-prompt="master" id="copyBtnMaster"><span id="copyBtnTextMaster">Copy Master Prompt</span></button>
         </div>
 

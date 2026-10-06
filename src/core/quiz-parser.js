@@ -100,8 +100,21 @@ export function parseQuizData(data, fileName) {
     }
 
     const normalized = normalizeQuestions(rawList, mainTopic, quizType);
-    topics.push({ topic: mainTopic, questions: normalized });
     questions = normalized;
+
+    // Tự động gom nhóm theo các topic / chương khác nhau nếu có
+    const topicGroups = {};
+    normalized.forEach((q) => {
+      const topName = q.topic || mainTopic;
+      if (!topicGroups[topName]) topicGroups[topName] = [];
+      topicGroups[topName].push(q);
+    });
+    const topicKeys = Object.keys(topicGroups);
+    if (topicKeys.length > 1) {
+      topics = topicKeys.map((key) => ({ topic: key, questions: topicGroups[key] }));
+    } else {
+      topics.push({ topic: mainTopic, questions: normalized });
+    }
   }
   // Case 2.5: Object with sections, parts, or groups (phân chia theo từng phần)
   else if (
@@ -337,17 +350,41 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
     }
   }
 
-  // 3. Nhận diện câu hỏi có đánh số: "Câu 1.", "Câu 1:", "Question 1:", "1.", "1)"
+  // 3. Tìm các tiêu đề chương/phần trong văn bản (CHƯƠNG 1..., PHẦN I...)
+  const chapterHeaders = [];
+  const chapRegex = /(?:^|\n)\s*((?:CHƯƠNG|Chương|PHẦN|Phần|BÀI|Bài|SECTION|Section)\s*[\dIVX]+[^\n]*)/gi;
+  let chMatch;
+  while ((chMatch = chapRegex.exec(text)) !== null) {
+    chapterHeaders.push({
+      index: chMatch.index,
+      title: chMatch[1].trim()
+    });
+  }
+
+  // 4. Nhận diện câu hỏi có đánh số: "Câu 1.", "Câu 1:", "Question 1:", "1.", "1)"
   const blockRegex =
-    /(?:^|\n)(?:(?:Câu|Question|Bài|Item)\s*(\d+)[\.\:\-\)]|\b(\d+)[\.\:\-\)])\s*([\s\S]*?)(?=(?:\n(?:(?:Câu|Question|Bài|Item)\s*\d+[\.\:\-\)]|\d+[\.\:\-\)]))|$)/gi;
+    /(?:^|\n)(?:(?:Câu|Question|Bài|Item)\s*(\d+)[\.\:\-\)]|\b(\d+)[\.\:\-\)])\s*([\s\S]*?)(?=(?:\n\s*(?:CHƯƠNG|Chương|PHẦN|Phần|BÀI|Bài|SECTION|Section)\s*[\dIVX]+|\n\s*(?:(?:Câu|Question|Bài|Item)\s*\d+[\.\:\-\)]|\d+[\.\:\-\)]))|$)/gi;
   let blockMatch;
   let autoId = 1;
 
   while ((blockMatch = blockRegex.exec(text)) !== null) {
+    const matchIndex = blockMatch.index;
     const qNumStr = blockMatch[1] || blockMatch[2] || String(autoId++);
     const qNum = parseInt(qNumStr, 10);
     const body = (blockMatch[3] || "").trim();
     if (!body) continue;
+
+    // Tìm chương / phần tương ứng với câu hỏi
+    let activeTopic = mainTopic;
+    let chapPrefix = "";
+    if (chapterHeaders.length > 0) {
+      const prevChap = [...chapterHeaders].reverse().find((c) => c.index <= matchIndex);
+      if (prevChap) {
+        activeTopic = prevChap.title;
+        const numMatch = activeTopic.match(/[\dIVX]+/);
+        chapPrefix = numMatch ? `C${numMatch[0]}_` : "";
+      }
+    }
 
     let questionAndOpts = body;
     let explanation = "";
@@ -368,17 +405,30 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
       questionAndOpts = questionAndOpts.slice(0, ansMatch.index).trim();
     }
 
+    // Tách các phương án nằm trên cùng 1 dòng (VD: "a. Đúng b. Sai")
+    questionAndOpts = questionAndOpts.replace(/\s+([B-Db-d])[\.\)\:\-\]]\s+/g, "\n$1. ");
+
     const options = [];
     const optRegex = /(?:^|\n)\s*([A-Da-d])[\.\)\:\-\]]\s*([^\n]+)/g;
     let optMatch;
     let firstOptIndex = -1;
+    let markedAnswer = "";
 
     while ((optMatch = optRegex.exec(questionAndOpts)) !== null) {
       if (firstOptIndex === -1) firstOptIndex = optMatch.index;
-      options.push(`${optMatch[1].toUpperCase()}. ${optMatch[2].trim()}`);
+      let optText = optMatch[2].trim();
+      if (/(?:\(Đ\)|\(Đúng\)|\[Đ\]|\[Đúng\]|\*)$/i.test(optText)) {
+        optText = optText.replace(/\s*(?:\(Đ\)|\(Đúng\)|\[Đ\]|\[Đúng\]|\*)$/i, "").trim();
+        markedAnswer = `${optMatch[1].toUpperCase()}. ${optText}`;
+      }
+      options.push(`${optMatch[1].toUpperCase()}. ${optText}`);
     }
 
-    const promptText =
+    if (markedAnswer && !correctAnswer) {
+      correctAnswer = markedAnswer;
+    }
+
+    let promptText =
       firstOptIndex !== -1 ? questionAndOpts.slice(0, firstOptIndex).trim() : questionAndOpts;
 
     // Kiểm tra xem câu hỏi có đoạn trích riêng không
@@ -400,8 +450,26 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
 
     const hasOptions = options.length >= 2;
     let type = hasOptions ? "multiple_choice" : "essay";
-    if (!hasOptions && correctAnswer && /^-?\d+([.,]\d+)?$/.test(correctAnswer.trim())) {
-      type = "short_answer";
+    let acceptableAnswers = [];
+
+    // Nhận diện đáp án ở đuôi câu nếu không có options (VD: "... bằng bao nhiêu? Bằng 1" hoặc "tăng: 3")
+    if (!hasOptions) {
+      const tailMatch = promptText.match(/^(.*?[\?\:])\s*([^\n\?]+)$/s);
+      if (tailMatch && tailMatch[2].trim().length > 0 && tailMatch[2].trim().length < 80) {
+        const rawTail = tailMatch[2].trim();
+        if (rawTail.includes("=>") || rawTail.includes("=")) {
+          explanation = explanation ? `${explanation}\n${rawTail}` : rawTail;
+          const afterEq = rawTail.split(/=>|=/).pop().trim();
+          correctAnswer = afterEq || rawTail;
+        } else {
+          correctAnswer = rawTail;
+        }
+        promptText = tailMatch[1].trim();
+        type = "short_answer";
+        acceptableAnswers = [correctAnswer];
+      } else if (correctAnswer && /^-?\d+([.,]\d+)?$/.test(correctAnswer.trim())) {
+        type = "short_answer";
+      }
     }
 
     if (hasOptions && correctAnswer) {
@@ -416,15 +484,16 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
     }
 
     questions.push({
-      id: `Q${qNum}`,
+      id: `${chapPrefix}Q${qNum}`,
       question: promptText,
       options,
       answer: correctAnswer || (hasOptions ? options[0] : ""),
-      topic: mainTopic,
+      topic: activeTopic,
       type,
       explanation,
       passage,
-      blankIndex
+      blankIndex,
+      acceptableAnswers
     });
   }
 
@@ -433,6 +502,18 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
   const distinctTypes = new Set(questions.map((q) => q.type).filter(Boolean));
   const finalQuizType = distinctTypes.size > 1 ? "mixed" : (Array.from(distinctTypes)[0] || "multiple_choice");
 
+  // Gom nhóm theo topics nếu có nhiều chương
+  const topicGroups = {};
+  questions.forEach((q) => {
+    const tName = q.topic || mainTopic;
+    if (!topicGroups[tName]) topicGroups[tName] = [];
+    topicGroups[tName].push(q);
+  });
+  const tKeys = Object.keys(topicGroups);
+  const topics = tKeys.length > 1
+    ? tKeys.map((k) => ({ topic: k, questions: topicGroups[k] }))
+    : null;
+
   return {
     fileName: suggestedName,
     mainTopic,
@@ -440,7 +521,7 @@ export function parseRawTextQuiz(rawText = "", suggestedName = "Bộ đề từ 
     quizType: finalQuizType,
     questions,
     totalQuestions: questions.length,
-    topics: null
+    topics
   };
 }
 
