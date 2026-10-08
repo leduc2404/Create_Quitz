@@ -377,6 +377,8 @@
             </button>
             <div class="q-text" id="questionText"></div>
             <div class="options-container" id="optionsContainer"></div>
+            <!-- Thẻ gợi ý / giải thích phong cách Flashcard 3D -->
+            <div class="q-explanation-card-wrap" id="qExplanationCardWrap" hidden></div>
           </div>
         </div>
       </div>
@@ -580,6 +582,9 @@ Dựa vào tài liệu người dùng cung cấp (ví dụ: tài liệu ôn tậ
   "type": "short_answer" (nếu câu trả lời ngắn) HOẶC "type": "essay" (nếu câu hỏi yêu cầu giải thích dài/nhiều ý):
   "answer": "Mô hình có hiện tượng tự tương quan dương bậc 1",
   "explanation": "Tiêu chuẩn kiểm định và kết luận chi tiết."
+
+- Bài đọc hiểu / Ngữ cảnh / Đục lỗ dùng chung cho nhiều câu hỏi (Reading Comprehension / Cloze):
+  BẮT BUỘC trích xuất trọn vẹn văn bản bài đọc vào trường "passage", tiêu đề vào "passageTitle" cho toàn bộ các câu hỏi thuộc bài đọc đó. Với bài đục lỗ, thêm "blankIndex". Tuyệt đối không bỏ sót bài đọc.
 
 5. CÔNG THỨC TOÁN &amp; KÝ HIỆU CHUYÊN NGÀNH:
 - Giữ nguyên công thức và ký hiệu: Yi = β1 + β2Xi + Ui, R^2, ESS, TSS, RSS, dL &lt;= d &lt;= dU, σ^2, v.v.
@@ -791,36 +796,77 @@ QUY TẮC:
             id="copyBtnTextTnNganTuLuan">Copy prompt</span></button>
       </div>
 
-      <!-- 4. Tiếng Anh: Đọc hiểu & Đục lỗ (Rút gọn súc tích) -->
+      <!-- 4. Tiếng Anh: Đọc hiểu & Đục lỗ theo ngữ cảnh chuẩn quốc tế -->
       <div class="prompt-content" id="promptTiengAnh">
-        <pre class="prompt-box" id="promptBoxTiengAnh">Bạn là chuyên gia khảo thí Tiếng Anh chuẩn quốc tế (IELTS / SAT / THPTQG). Hãy trích xuất hoặc biên soạn bài tập ĐỌC HIỂU hoặc ĐỤC LỖ Tiếng Anh ngắn gọn, chuẩn định dạng JSON sau:
+        <pre class="prompt-box" id="promptBoxTiengAnh">Bạn là chuyên gia khảo thí Tiếng Anh chuẩn quốc tế (TOEIC, IELTS, SAT, THPTQG). Hãy quét toàn bộ đề thi / tài liệu người dùng cung cấp (kể cả ảnh chụp, PDF, văn bản) và chuyển đổi thành MỘT FILE JSON duy nhất chuẩn cấu trúc sau:
 
 {
-  "topic": "Tiếng Anh - [TÊN CHỦ ĐỀ]",
+  "format": "mixed",
+  "topic": "TÊN BÀI THI / ĐỀ THI TIẾNG ANH",
   "questions": [
     {
-      "id": "ENG_1",
-      "passageTitle": "Tiêu đề bài đọc hoặc đoạn văn",
-      "passage": "Nội dung bài đọc (hoặc đoạn văn đục lỗ có đánh số (1) _____, (2) _____...)",
-      "blankIndex": 1,
-      "question": "Câu hỏi đọc hiểu HOẶC 'Choose the best word for blank (1):'",
+      "id": "P1_Q1",
+      "type": "multiple_choice",
+      "topic": "PART 1: INCOMPLETE SENTENCES",
+      "question": "I was waiting for her at the ________ desk.",
       "options": [
-        "A. Phương án A",
-        "B. Phương án B",
-        "C. Phương án C",
-        "D. Phương án D"
+        "A. receptioner",
+        "B. receptionist",
+        "C. receptions",
+        "D. reception"
       ],
-      "answer": "A. Phương án A",
-      "explanation": "Trích dẫn dòng/câu trong bài đọc và giải thích chi tiết ngữ cảnh hoặc ngữ pháp."
+      "answer": "D. reception",
+      "explanation": "Từ cần điền là danh từ ghép 'reception desk' (quầy lễ tân)."
+    },
+    {
+      "id": "P2_Q22",
+      "type": "multiple_choice",
+      "topic": "PART 2: INCOMPLETE TEXT",
+      "passageTitle": "Email: Friday's meeting with Dylan Peterson (Questions 22-24)",
+      "passage": "To: Elizabeth Turner\nFrom: Edmund Black\nRe: Friday’s meeting\n\nI am not (22)__________ if you have remembered or not, what with the Christmas and New Year holidays, but we have a meeting with Dylan Peterson on Friday. As that is only three days (23) _______, I’d really like to meet up and talk with you beforehand. We really need to look as though we know what we’re talking about, so I think it would be helpful to meet and make some notes so that we can present a (24)__________ argument.",
+      "blankIndex": 22,
+      "question": "Choose the best word for blank (22):",
+      "options": [
+        "A. able",
+        "B. sure",
+        "C. knowing",
+        "D. allowed"
+      ],
+      "answer": "B. sure",
+      "explanation": "Cụm cố định 'I am not sure if...' có nghĩa là 'Tôi không chắc liệu...'."
+    },
+    {
+      "id": "P3_Q31",
+      "type": "short_answer",
+      "topic": "PART 3: READING COMPREHENSION",
+      "passageTitle": "King's Department Store Advertisement (Questions 31-33)",
+      "passage": "King's Department Store\nAttention: Valued Customers\n\nWe're moving to our new, more luxurious downtown location next month! To avoid the high costs of moving our products, we're having a SPECIAL SALE!\n\n| Floor | Discounts & Items |\n|---|---|\n| 5th Floor | All books and toys are 60% off. |\n| 4th Floor | Furniture, tools, and hardware at up to 70% off. |\n| 3rd Floor | Women's and girls' clothing at 40% off. (excluding swimwear) |\n| 2nd Floor | Men's and boys' clothing at 40% off. (excluding swimwear) |\n| 1st Floor | Up to 75% off all canned and dry goods in the supermarket. |",
+      "question": "Where should Peter and his father go to buy new clothes?",
+      "answer": "2nd Floor",
+      "acceptableAnswers": ["The 2nd Floor", "2nd floor", "To the 2nd Floor"],
+      "explanation": "Trong bảng thông tin: '2nd Floor' bán 'Men's and boys' clothing at 40% off' (quần áo nam và bé trai)."
     }
   ]
 }
 
-QUY TẮC SÚC TÍCH:
-1. Trường 'passage': Toàn bộ bài đọc hoặc đoạn văn đục lỗ dài. Tất cả các câu hỏi thuộc cùng một bài dùng chung trường này.
-2. Với bài đục lỗ: Đánh số chỗ trống trong passage là '(1) _____', '(2) _____', và mỗi câu hỏi khai báo thêm 'blankIndex' là số thứ tự tương ứng (1, 2, 3...).
-3. Với bài đọc hiểu thông thường: Không cần trường 'blankIndex'.
-4. Đảm bảo đầy đủ 4 options A, B, C, D, đáp án chính xác và lời giải chi tiết.</pre>
+QUY TẮC BẮT BUỘC (CRITICAL RULES):
+1. BÀI ĐỌC HIỂU (READING COMPREHENSION):
+- Nếu một bài đọc (quảng cáo, bài báo, thông báo, thư từ, bảng biểu) dùng chung cho một nhóm câu hỏi (VD: Questions 31-33, Questions 34-36):
+  + BẮT BUỘC trích xuất 100% TOÀN BỘ NỘI DUNG VĂN BẢN VÀ BẢNG BIỂU vào trường "passage" của TẤT CẢ các câu hỏi thuộc nhóm đó!
+  + TUYỆT ĐỐI KHÔNG BỎ QUA BÀI ĐỌC! Nếu không có bài đọc, học sinh không thể trả lời được.
+  + Đặt tên bài đọc trong trường "passageTitle" (kèm phạm vi câu, VD: "King's Department Store Advertisement (Questions 31-33)").
+  + Trường "question" CHỈ chứa câu hỏi thực tế (VD: "Where should Peter and his father go to buy new clothes?"). TUYỆT ĐỐI KHÔNG lặp lại "Based on the advertisement:".
+  + Nếu bài đọc có bảng biểu, hãy định dạng bảng Markdown (| Cột 1 | Cột 2 |) để hiển thị rõ ràng.
+
+2. BÀI ĐỤC LỖ / ĐOẠN VĂN KHUYẾT (INCOMPLETE TEXT / CLOZE TEST):
+- BẮT BUỘC giữ nguyên văn toàn bộ bức thư/đoạn văn hoàn chỉnh trong trường "passage" với các vị trí đục lỗ đánh số rõ ràng: (22)______, (23)______, (24)______...
+- TUYỆT ĐỐI KHÔNG cắt vụn bài đọc thành từng câu nhỏ lẻ! Toàn bộ các câu hỏi trong cùng một đoạn văn đục lỗ dùng chung nguyên văn trường "passage".
+- Mỗi câu hỏi khai báo "blankIndex" tương ứng (VD: 22, 23...).
+
+3. ĐỊNH DẠNG CÂU HỎI:
+- Trắc nghiệm: "type": "multiple_choice", mảng "options" gồm 4 đáp án A, B, C, D.
+- Trả lời ngắn / điền từ: "type": "short_answer", "answer" là đáp án chuẩn nhất, "acceptableAnswers" là các cách viết tương đương được chấp nhận.
+- Mọi câu hỏi đều có "explanation" giải thích chi tiết đáp án và trích dẫn dẫn chứng từ bài đọc.</pre>
         <button class="ghost-btn" data-prompt="tienganh" id="copyBtnTiengAnh"><span id="copyBtnTextTiengAnh">Copy
             prompt</span></button>
       </div>

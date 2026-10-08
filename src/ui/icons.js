@@ -63,7 +63,10 @@ import {
   Clock,
   Layers,
   ListOrdered,
-  Shuffle
+  Shuffle,
+  Lightbulb,
+  Copy,
+  Check
 } from "lucide";
 export const ICONS = {
   Home,
@@ -129,7 +132,10 @@ export const ICONS = {
   Clock,
   Layers,
   ListOrdered,
-  Shuffle
+  Shuffle,
+  Lightbulb,
+  Copy,
+  Check
 };
 
 /** IconNode → chuỗi SVG (stroke currentColor, outline) */

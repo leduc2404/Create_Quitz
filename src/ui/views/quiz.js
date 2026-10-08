@@ -13,7 +13,8 @@ import {
   formatRichText,
   cleanOptionPrefix,
   splitPassageAndPrompt,
-  formatPassageWithClozeAndParagraphs
+  formatPassageWithClozeAndParagraphs,
+  escapeHtml
 } from "../util.js";
 import { perf } from "../../core/perf.js";
 import { fmtScore } from "../../core/exam-config.js";
@@ -289,10 +290,12 @@ export function renderQuestion() {
     fcScene.hidden = false;
     normalView.hidden = true;
     passageEl.hidden = true;
+    hideQuestionExplanation();
     renderFlashcard3D(question);
   } else {
     fcScene.hidden = true;
     normalView.hidden = false;
+    hideQuestionExplanation();
     renderPassageAndPrompt(question);
     updateStickyBarText(question);
 
@@ -355,6 +358,16 @@ function renderPassageAndPrompt(question) {
   let passageText = question.passage || "";
   let promptText = question.question || "";
 
+  // Bóc tách tiền tố ngữ cảnh (Context Lead-in) như "Based on the... :"
+  const leadMatch = promptText.match(/^(?:Based\s+on\s+(?:the\s+)?([^\:\n]+)\:?\s*\n+|According\s+to\s+(?:the\s+)?([^\:\n]+)\:?\s*\n+)([\s\S]*)$/i);
+  let contextLead = "";
+  if (leadMatch) {
+    contextLead = (leadMatch[1] || leadMatch[2] || "").trim();
+    if (leadMatch[3].trim()) {
+      promptText = leadMatch[3].trim();
+    }
+  }
+
   if (!passageText) {
     const split = splitPassageAndPrompt(promptText);
     if (split.hasPassage) {
@@ -375,8 +388,9 @@ function renderPassageAndPrompt(question) {
     if (peekBanner) peekBanner.hidden = false;
 
     if (passageBadge) {
-      passageBadge.textContent = question.passageTitle
-        ? `BÀI ĐỌC · ${question.passageTitle.toUpperCase()}`
+      const bTitle = question.passageTitle || contextLead;
+      passageBadge.textContent = bTitle
+        ? `BÀI ĐỌC · ${bTitle.toUpperCase()}`
         : "VĂN BẢN / NGỮ CẢNH ĐỌC HIỂU";
     }
 
@@ -431,7 +445,10 @@ function renderPassageAndPrompt(question) {
       }
     }
 
-    promptEl.innerHTML = formatRichText(promptText);
+    const formattedPrompt = formatRichText(promptText);
+    promptEl.innerHTML = contextLead
+      ? `<div class="q-context-lead"><span class="q-context-tag">📌 Ngữ cảnh</span> <span class="q-context-name">${escapeHtml(contextLead)}</span></div><div class="q-stem">${formattedPrompt}</div>`
+      : formattedPrompt;
   } else {
     lastRenderedPassage = null;
     passageEl.hidden = true;
@@ -440,7 +457,10 @@ function renderPassageAndPrompt(question) {
     if (mobileTabs) mobileTabs.hidden = true;
     if (peekBanner) peekBanner.hidden = true;
     if (qContentSplit) qContentSplit.classList.remove("mobile-show-passage");
-    promptEl.innerHTML = formatRichText(promptText);
+    const formattedPrompt = formatRichText(promptText);
+    promptEl.innerHTML = contextLead
+      ? `<div class="q-context-lead"><span class="q-context-tag">📌 Ngữ cảnh</span> <span class="q-context-name">${escapeHtml(contextLead)}</span></div><div class="q-stem">${formattedPrompt}</div>`
+      : formattedPrompt;
   }
 }
 
@@ -522,6 +542,16 @@ function renderMultipleChoice(container, question, isExam = false) {
 
     container.appendChild(btn);
   });
+
+  // Trong chế độ Luyện tập: Nếu câu đã được trả lời trước đó, hiển thị thẻ giải thích
+  if (!isExam && currentAnswer) {
+    showQuestionExplanation({
+      question,
+      userChoice: currentAnswer.value,
+      isCorrect: currentAnswer.ok,
+      animate: false
+    });
+  }
 }
 
 function selectOption(btn, selectedOption) {
@@ -548,8 +578,225 @@ function selectOption(btn, selectedOption) {
   });
   btn.classList.add(result ? "correct" : "incorrect");
 
+  // Hiển thị thẻ gợi ý / giải thích phía dưới đẹp mắt chuẩn phong cách Flashcard 3D
+  showQuestionExplanation({
+    question,
+    userChoice: selectedOption,
+    isCorrect: result,
+    animate: true
+  });
+
   showNextCta();
   persistSession();
+}
+
+/**
+ * Trợ giúp giải mã chi tiết lựa chọn (chữ cái A-D và nội dung)
+ */
+function resolveOptionDetails(question, val) {
+  if (val == null) return { letter: "", text: "", full: "" };
+  const rawVal = String(val).trim();
+  const cleanedVal = cleanOptionPrefix(rawVal);
+  const valTextLower = (cleanedVal.text || rawVal).toLowerCase();
+
+  const options = Array.isArray(question.options) ? question.options : [];
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    const cleanedOpt = cleanOptionPrefix(opt);
+    const optTextLower = (cleanedOpt.text || String(opt)).toLowerCase();
+    const optKeyUpper = (cleanedOpt.key || "ABCD"[i] || "").toUpperCase();
+
+    if (
+      String(opt).trim().toLowerCase() === rawVal.toLowerCase() ||
+      optTextLower === valTextLower ||
+      (cleanedVal.key && cleanedVal.key === optKeyUpper) ||
+      (rawVal.length === 1 && rawVal.toUpperCase() === optKeyUpper)
+    ) {
+      const letter = optKeyUpper || "ABCD"[i] || String.fromCharCode(65 + i);
+      const displayText = cleanedOpt.text || String(opt).trim();
+      return { letter, text: displayText, full: `[${letter}] ${displayText}` };
+    }
+  }
+
+  if (cleanedVal.key && cleanedVal.text) {
+    return { letter: cleanedVal.key, text: cleanedVal.text, full: `[${cleanedVal.key}] ${cleanedVal.text}` };
+  }
+  return { letter: "", text: rawVal, full: rawVal };
+}
+
+/**
+ * Ẩn và dọn dẹp thẻ gợi ý / giải thích
+ */
+export function hideQuestionExplanation() {
+  const wrap = document.getElementById("qExplanationCardWrap");
+  if (!wrap) return;
+  wrap.hidden = true;
+  wrap.innerHTML = "";
+  wrap.classList.remove("animate-reveal");
+}
+
+/**
+ * Hiển thị ô giải thích / gợi ý đơn giản, đẹp mắt dưới câu hỏi
+ */
+export function showQuestionExplanation({
+  question,
+  userChoice = null,
+  isCorrect = false,
+  animate = true,
+  customAnswerSummary = ""
+}) {
+  // Không làm lộ đáp án trong chế độ Thi thử (Exam Mode)
+  if (engine.studyMode === "exam") return;
+
+  const wrap = document.getElementById("qExplanationCardWrap");
+  if (!wrap) return;
+
+  const explanation = question.explanation ? String(question.explanation).trim() : "";
+  const hint = question.hint ? String(question.hint).trim() : "";
+
+  // 1. Xác định Trạng thái (Status Badge & Theme màu)
+  let statusTheme = "theme-correct";
+  let statusPillClass = "is-ok";
+  let statusIcon = iconSvg("CircleCheck", 15);
+  let statusLabel = "Chính xác";
+
+  if (userChoice === "(Đã tự xem đáp án)") {
+    statusTheme = "theme-info";
+    statusPillClass = "is-info";
+    statusIcon = iconSvg("Lightbulb", 15);
+    statusLabel = "Lời giải chi tiết";
+  } else if (userChoice === null && !customAnswerSummary) {
+    statusTheme = "theme-incorrect";
+    statusPillClass = "is-bad";
+    statusIcon = iconSvg("Clock", 15);
+    statusLabel = "Hết thời gian";
+  } else if (customAnswerSummary && userChoice === null) {
+    if (isCorrect) {
+      statusTheme = "theme-correct";
+      statusPillClass = "is-ok";
+      statusIcon = iconSvg("CircleCheck", 15);
+      statusLabel = "Chính xác";
+    } else {
+      statusTheme = "theme-info";
+      statusPillClass = "is-info";
+      statusIcon = iconSvg("Info", 15);
+      statusLabel = "Đối chiếu kết quả";
+    }
+  } else if (!isCorrect) {
+    statusTheme = "theme-incorrect";
+    statusPillClass = "is-bad";
+    statusIcon = iconSvg("CircleX", 15);
+    statusLabel = "Chưa chính xác";
+  }
+
+  // 2. Xác định Đáp án đúng chính xác để hiển thị nổi bật
+  let answerBadgeHtml = "";
+  if (customAnswerSummary) {
+    answerBadgeHtml = `
+      <div class="q-exp-answer-pill">
+        <span class="q-exp-answer-label">Đáp án:</span>
+        <span class="q-exp-key-badge no-letter">
+          <span class="q-exp-key-text">${escapeHtml(customAnswerSummary)}</span>
+        </span>
+      </div>
+    `;
+  } else {
+    const resolvedAns = resolveOptionDetails(question, question.answer);
+    if (resolvedAns.letter) {
+      answerBadgeHtml = `
+        <div class="q-exp-answer-pill">
+          <span class="q-exp-answer-label">Đáp án đúng:</span>
+          <span class="q-exp-key-badge">
+            <span class="q-exp-letter-char">${escapeHtml(resolvedAns.letter)}</span>
+            <span class="q-exp-key-text">${escapeHtml(resolvedAns.text || resolvedAns.full)}</span>
+          </span>
+        </div>
+      `;
+    } else {
+      const ansVal = resolvedAns.full || question.answer || "";
+      if (ansVal) {
+        answerBadgeHtml = `
+          <div class="q-exp-answer-pill">
+            <span class="q-exp-answer-label">Đáp án đúng:</span>
+            <span class="q-exp-key-badge no-letter">
+              <span class="q-exp-key-text">${escapeHtml(ansVal)}</span>
+            </span>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // 3. Nội dung giải thích & gợi ý
+  let bodyContentHtml = "";
+  if (explanation) {
+    bodyContentHtml += `<div class="q-exp-text">${formatRichText(explanation)}</div>`;
+    if (hint && hint !== explanation) {
+      bodyContentHtml += `
+        <div class="q-exp-hint-note">
+          <span class="q-exp-hint-tag">${iconSvg("Sparkles", 13)} Mẹo ghi nhớ:</span>
+          <span class="q-exp-hint-content">${formatRichText(hint)}</span>
+        </div>
+      `;
+    }
+  } else if (hint) {
+    bodyContentHtml += `
+      <div class="q-exp-hint-note standalone">
+        <span class="q-exp-hint-tag">${iconSvg("Sparkles", 13)} Gợi ý:</span>
+        <span class="q-exp-hint-content">${formatRichText(hint)}</span>
+      </div>
+    `;
+  } else {
+    const resolvedAns = resolveOptionDetails(question, question.answer);
+    const ansFallback = resolvedAns.full || question.answer || "";
+    if (ansFallback) {
+      bodyContentHtml += `
+        <div class="q-exp-empty-note">
+          Lựa chọn chính xác cho câu này là <strong>${escapeHtml(ansFallback)}</strong>.
+        </div>
+      `;
+    }
+  }
+
+  if (!answerBadgeHtml && !bodyContentHtml) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+  if (animate) {
+    wrap.classList.remove("animate-reveal");
+    void wrap.offsetWidth;
+    wrap.classList.add("animate-reveal");
+  } else {
+    wrap.classList.remove("animate-reveal");
+  }
+
+  wrap.innerHTML = `
+    <div class="q-explanation-card ${statusTheme}">
+      <div class="q-exp-topbar">
+        <div class="q-exp-status-pill ${statusPillClass}">
+          ${statusIcon}
+          <span>${statusLabel}</span>
+        </div>
+        ${answerBadgeHtml}
+      </div>
+      ${bodyContentHtml ? `<div class="q-exp-body">${bodyContentHtml}</div>` : ""}
+    </div>
+  `;
+
+  // Tự động cuộn mượt đến ô giải thích nếu bị khuất một phần
+  if (animate) {
+    setTimeout(() => {
+      const card = wrap.querySelector(".q-explanation-card");
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight) {
+          card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+    }, 100);
+  }
 }
 
 // ---------- Chế độ Flashcard 3D ----------
@@ -682,6 +929,12 @@ function onTimeout() {
     document.querySelectorAll(".option-btn").forEach((b) => {
       b.classList.add("disabled");
       if (b.textContent === question.answer) b.classList.add("correct");
+    });
+    showQuestionExplanation({
+      question,
+      userChoice: null,
+      isCorrect: false,
+      animate: true
     });
   }
 
@@ -933,108 +1186,131 @@ function showTfFeedback(container, question, chosen, result) {
   chip.className = "tf-score";
   chip.textContent = `Điểm câu này: +${fmtScore(result.earned)}đ / ${fmtScore(result.maxPoints)}đ`;
   container.appendChild(chip);
+
+  const tfSummary = (question.items || [])
+    .map((item, idx) => `${"abcd"[idx] || idx + 1}) ${item.correct ? "Đúng" : "Sai"}`)
+    .join(" · ");
+
+  showQuestionExplanation({
+    question,
+    userChoice: null,
+    isCorrect: result.ok,
+    animate: true,
+    customAnswerSummary: tfSummary
+  });
 }
 
 // ---------- Phần III: Trả lời ngắn & Chế độ nhập / xem đáp án ----------
 function renderShortAnswer(container, question, isExam = false) {
-  const row = document.createElement("div");
-  row.className = "short-row";
+  const box = document.createElement("div");
+  box.className = "short-container";
+
+  const isNumericOnly = question.examFormat === "thpt2026" || /^-?\d+([.,]\d+)?$/.test(String(question.answer || "").trim());
+  const currentAnswer = engine.userAnswers[engine.index];
 
   const inputWrap = document.createElement("div");
   inputWrap.className = "short-input-wrap";
 
   const input = document.createElement("input");
-  input.className = "input short-input";
+  input.className = "short-input";
   input.type = "text";
-
-  // Tối ưu bàn phím: nếu đáp án là số thì mở bàn phím số, nếu là từ/chữ thì mở bàn phím văn bản
-  const isNumericOnly = question.examFormat === "thpt2026" || /^-?\d+([.,]\d+)?$/.test(String(question.answer || "").trim());
   input.inputMode = isNumericOnly ? "decimal" : "text";
   input.autocomplete = "off";
   input.placeholder = isNumericOnly
-    ? "Nhập đáp án số (VD: -1.5 hoặc 0,25)"
-    : "Nhập câu trả lời ngắn của bạn...";
+    ? "Nhập đáp án số (VD: -1.5 hoặc 0.25)..."
+    : "Nhập câu trả lời của bạn...";
 
-  const currentAnswer = engine.userAnswers[engine.index];
   if (currentAnswer) {
     input.value = currentAnswer.value ?? "";
   }
 
   inputWrap.appendChild(input);
-  row.appendChild(inputWrap);
 
   if (isExam) {
     input.addEventListener("input", (e) => {
       engine.answerShortAnswer(e.target.value.trim());
       persistSession();
     });
+    box.appendChild(inputWrap);
   } else {
-    const actionBtns = document.createElement("div");
-    actionBtns.className = "short-action-btns";
-
-    const submit = document.createElement("button");
-    submit.className = "primary-btn";
-    submit.type = "button";
-    submit.textContent = "Trả lời";
-    submit.addEventListener("click", () => submitShortAnswer(container, question, input.value));
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "short-submit-btn";
+    submitBtn.type = "button";
+    submitBtn.innerHTML = `<span>Gửi</span><span class="short-kbd-hint">↵</span>`;
+    submitBtn.addEventListener("click", () => submitShortAnswer(container, question, input.value));
 
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit.click();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitBtn.click();
+      }
     });
 
+    inputWrap.appendChild(submitBtn);
+    box.appendChild(inputWrap);
+
+    const actionsBar = document.createElement("div");
+    actionsBar.className = "short-actions-bar";
+
+    const hint = document.createElement("span");
+    hint.className = "short-hint-text";
+    hint.innerHTML = `Nhấn <kbd>Enter ↵</kbd> để kiểm tra đáp án`;
+
     const revealBtn = document.createElement("button");
-    revealBtn.className = "ghost-btn short-reveal-btn";
+    revealBtn.className = "short-reveal-btn";
     revealBtn.type = "button";
-    revealBtn.innerHTML = `<span>Xem đáp án 👁</span>`;
+    revealBtn.textContent = "Xem đáp án";
     revealBtn.addEventListener("click", () => revealShortAnswer(container, question));
 
-    actionBtns.append(submit, revealBtn);
-    row.appendChild(actionBtns);
+    actionsBar.append(hint, revealBtn);
+    box.appendChild(actionsBar);
 
     if (currentAnswer) {
       input.disabled = true;
-      submit.disabled = true;
+      submitBtn.disabled = true;
       revealBtn.disabled = true;
+      inputWrap.classList.add(currentAnswer.ok ? "is-correct" : "is-incorrect");
       showShortFeedback(container, question, { ok: currentAnswer.ok });
     }
   }
 
-  container.appendChild(row);
+  container.appendChild(box);
+  if (!currentAnswer && !isExam) {
+    setTimeout(() => input.focus(), 60);
+  }
 }
 
 function revealShortAnswer(container, question) {
   if (engine.answered) return;
 
   const input = container.querySelector(".short-input");
-  const actionBtns = container.querySelector(".short-action-btns");
+  const inputWrap = container.querySelector(".short-input-wrap");
+  const actionsBar = container.querySelector(".short-actions-bar");
   if (input) input.disabled = true;
-  if (actionBtns) actionBtns.style.display = "none";
+  if (inputWrap) inputWrap.style.opacity = "0.7";
+  if (actionsBar) actionsBar.style.display = "none";
 
   const card = document.createElement("div");
   card.className = "short-reveal-card";
 
-  const label = document.createElement("div");
+  const head = document.createElement("div");
+  head.className = "short-reveal-head";
+  const label = document.createElement("span");
   label.className = "short-reveal-label";
   label.textContent = "ĐÁP ÁN CHUẨN";
+  head.appendChild(label);
 
   const ans = document.createElement("div");
   ans.className = "short-reveal-answer";
   ans.textContent = question.answer;
 
-  card.append(label, ans);
+  card.append(head, ans);
 
   if (Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0) {
     const acc = document.createElement("div");
     acc.className = "short-reveal-acceptable";
-    acc.textContent = `Các cách viết được chấp nhận: ${question.acceptableAnswers.join(", ")}`;
+    acc.textContent = `Chấp nhận các cách viết: ${question.acceptableAnswers.join(", ")}`;
     card.appendChild(acc);
-  }
-
-  if (question.explanation) {
-    const exp = document.createElement("div");
-    exp.className = "short-reveal-explanation";
-    exp.innerHTML = `<strong>Lời giải:</strong> ${formatRichText(question.explanation)}`;
-    card.appendChild(exp);
   }
 
   // Hàng nút tự đánh giá cho người học (tự nhận diện đúng / cần ôn lại)
@@ -1044,7 +1320,7 @@ function revealShortAnswer(container, question) {
   const badBtn = document.createElement("button");
   badBtn.className = "short-grade-btn bad";
   badBtn.type = "button";
-  badBtn.innerHTML = `<span>✖ Chưa nhớ (Cần ôn)</span>`;
+  badBtn.innerHTML = `<span>✖ Cần ôn lại</span>`;
 
   const okBtn = document.createElement("button");
   okBtn.className = "short-grade-btn ok";
@@ -1066,12 +1342,17 @@ function revealShortAnswer(container, question) {
     if (timerCfg && timerCfg.enabled && timerCfg.mode === "question") stopTimer();
     recordReview(srsKey, isCorrect, { ...question });
 
-    const statusPill = document.createElement("div");
-    statusPill.className = `short-feedback ${isCorrect ? "ok" : "bad"}`;
-    statusPill.textContent = isCorrect
-      ? "Đã tự xác nhận: Bạn đã nhớ đúng!"
-      : "Đã tự xác nhận: Đánh dấu cần ôn tập lại.";
-    card.appendChild(statusPill);
+    const acceptable = Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0
+      ? ` (chấp nhận: ${question.acceptableAnswers.join(", ")})`
+      : "";
+
+    showQuestionExplanation({
+      question,
+      userChoice: isCorrect ? question.answer : "(Đã tự xem đáp án)",
+      isCorrect,
+      animate: true,
+      customAnswerSummary: question.answer + acceptable
+    });
 
     showNextCta();
     persistSession();
@@ -1087,8 +1368,15 @@ function revealShortAnswer(container, question) {
 }
 
 function submitShortAnswer(container, question, text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) {
+    toast("Vui lòng nhập câu trả lời trước khi gửi!", { type: "info" });
+    const input = container.querySelector(".short-input");
+    if (input) input.focus();
+    return;
+  }
   const srsKey = engine.currentKey();
-  const result = engine.answerShortAnswer(text);
+  const result = engine.answerShortAnswer(trimmed);
   if (!result) return;
 
   if (result.ok) playCorrectSound();
@@ -1101,7 +1389,7 @@ function submitShortAnswer(container, question, text) {
   toast(
     result.ok
       ? `Chính xác! +${fmtScore(result.earned)}đ`
-      : `Sai. Đáp án đúng: ${question.answer}`,
+      : `Chưa chính xác. Đáp án: ${question.answer}`,
     { duration: 1800 }
   );
   showNextCta();
@@ -1110,30 +1398,28 @@ function submitShortAnswer(container, question, text) {
 
 function showShortFeedback(container, question, result) {
   const input = container.querySelector(".short-input");
-  const actionBtns = container.querySelector(".short-action-btns");
-  const btn = container.querySelector(".short-row .primary-btn");
+  const inputWrap = container.querySelector(".short-input-wrap");
+  const submitBtn = container.querySelector(".short-submit-btn");
+  const actionsBar = container.querySelector(".short-actions-bar");
   if (input) input.disabled = true;
-  if (btn) btn.disabled = true;
-  if (actionBtns) actionBtns.style.display = "none";
+  if (submitBtn) submitBtn.disabled = true;
+  if (actionsBar) actionsBar.style.display = "none";
+  if (inputWrap) {
+    inputWrap.classList.remove("is-correct", "is-incorrect");
+    inputWrap.classList.add(result.ok ? "is-correct" : "is-incorrect");
+  }
 
   const acceptable = Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0
     ? ` (chấp nhận: ${question.acceptableAnswers.join(", ")})`
     : "";
 
-  const fb = document.createElement("div");
-  fb.className = `short-feedback ${result.ok ? "ok" : "bad"}`;
-  fb.textContent = result.ok
-    ? `Chính xác! Đáp án: ${question.answer}`
-    : `Sai. Đáp án đúng: ${question.answer}${acceptable}`;
-  container.appendChild(fb);
-
-  if (question.explanation) {
-    const exp = document.createElement("div");
-    exp.className = "short-reveal-explanation";
-    exp.style.marginTop = "10px";
-    exp.innerHTML = `<strong>Lời giải:</strong> ${formatRichText(question.explanation)}`;
-    container.appendChild(exp);
-  }
+  showQuestionExplanation({
+    question,
+    userChoice: input ? input.value : null,
+    isCorrect: result.ok,
+    animate: true,
+    customAnswerSummary: question.answer + acceptable
+  });
 }
 
 // ---------- Tiện ích chung ----------

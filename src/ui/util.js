@@ -21,8 +21,39 @@ export function formatRichText(rawText = "") {
   const paragraphs = safe.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
 
   const formattedBlocks = paragraphs.map((para) => {
+    const lines = para.split("\n").map((l) => l.trim()).filter(Boolean);
+
+    // Xử lý bảng Markdown nếu các dòng đều chứa ký tự |
+    const isTable = lines.length >= 2 && lines.every((l) => l.includes("|"));
+    if (isTable) {
+      const dataRows = lines.filter((l) => !/^\|?[\s\-:]+(\|[\s\-:]+)+\|?$/.test(l));
+      const hasHeaderSep = lines.some((l) => /^\|?[\s\-:]+(\|[\s\-:]+)+\|?$/.test(l));
+      const htmlRows = dataRows.map((r, rIdx) => {
+        const cells = r.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+        const isHeader = rIdx === 0 && hasHeaderSep;
+        const tag = isHeader ? "th" : "td";
+        const rowCells = cells.map((c) => `<${tag}>${formatInline(c)}</${tag}>`).join("");
+        return `<tr>${rowCells}</tr>`;
+      }).join("");
+      return `<div class="q-table-wrap"><table class="q-table"><tbody>${htmlRows}</tbody></table></div>`;
+    }
+
+    // Xử lý email header (To: ... / From: ... / Re: ...)
+    const isEmailHeader = lines.length >= 2 && lines.some(l => /^(?:To|From|Re|Subject|Date)\s*:/i.test(l));
+    if (isEmailHeader) {
+      const headerLines = lines.map(l => {
+        const colonIdx = l.indexOf(":");
+        if (colonIdx > 0 && /^(?:To|From|Re|Subject|Date)$/i.test(l.slice(0, colonIdx).trim())) {
+          const key = l.slice(0, colonIdx).trim();
+          const val = l.slice(colonIdx + 1).trim();
+          return `<div class="passage-email-field"><span class="email-key">${escapeHtml(key)}:</span> <span class="email-val">${formatInline(val)}</span></div>`;
+        }
+        return `<div>${formatInline(l)}</div>`;
+      }).join("");
+      return `<div class="passage-email-card">${headerLines}</div>`;
+    }
+
     // Xử lý danh sách gạch đầu dòng nếu có nhiều dòng bắt đầu bằng - hoặc +
-    const lines = para.split("\n").map((l) => l.trim());
     const isList = lines.length > 1 && lines.every((l) => l.startsWith("- ") || l.startsWith("+ ") || l.startsWith("• "));
     if (isList) {
       const items = lines.map((l) => {
@@ -84,7 +115,7 @@ export function cleanOptionPrefix(str = "") {
 
 /**
  * Phân tích câu hỏi dài: Tách Đoạn dẫn/Đoạn trích (Passage) và Câu hỏi trọng tâm (Stem).
- * Nhận diện câu dài (> 220 ký tự hoặc có chỉ dẫn đọc hiểu tiếng Anh/tiếng Việt).
+ * Nhận diện câu dài (> 140 ký tự hoặc có chỉ dẫn đọc hiểu tiếng Anh/tiếng Việt).
  */
 export function splitPassageAndPrompt(fullQuestion = "") {
   const text = String(fullQuestion || "").trim();
@@ -101,18 +132,19 @@ export function splitPassageAndPrompt(fullQuestion = "") {
     cleanText = text.slice(englishIntroMatch[0].length).trim();
   }
 
-  // Tách theo \n\n (nếu có ít nhất 2 đoạn văn và đoạn đầu đủ dài làm ngữ cảnh)
+  // Tách theo \n\n (nếu có ít nhất 2 đoạn văn và đoạn đầu làm ngữ cảnh)
   const parts = cleanText.split(/\n{2,}/);
   if (parts.length > 1) {
     const prompt = parts[parts.length - 1].trim();
     const passageContent = parts.slice(0, -1).join("\n\n").trim();
-    if (passageContent.length > 120 || instruction) {
+    const isEmail = /^(?:To|From|Re|Subject)\s*:/im.test(passageContent);
+    if (passageContent.length > 90 || instruction || isEmail) {
       const passage = instruction ? `${instruction}\n\n${passageContent}` : passageContent;
       return { hasPassage: true, passage, prompt: prompt || "Dựa vào đoạn trích trên, hãy trả lời câu hỏi sau:" };
     }
   }
 
-  if (instruction && cleanText.length > 80) {
+  if (instruction && cleanText.length > 60) {
     return { hasPassage: true, passage: `${instruction}\n\n${cleanText}`, prompt: "Dựa vào đoạn trích trên, hãy trả lời câu hỏi sau:" };
   }
 
@@ -123,7 +155,7 @@ export function splitPassageAndPrompt(fullQuestion = "") {
 /**
  * Định dạng đoạn văn bản đọc hiểu & đục lỗ tiếng Anh chuyên sâu:
  * - Đánh số đoạn văn [P1], [P2], [P3]...
- * - Tự động nhận diện chỗ trống (1), (2), [1], [2], ____(1)____
+ * - Tự động nhận diện chỗ trống (1), (2), [1], [2], ____(1)____, (22)__________
  * - Tô sáng neon chỗ trống đang làm (activeGap) kèm hiệu ứng phát sáng
  * - Biến chỗ trống thành clickable link để học sinh click nhảy đến câu hỏi
  */
@@ -139,22 +171,22 @@ export function formatPassageWithClozeAndParagraphs(rawPassage = "", activeGap =
 
   const formattedParagraphs = paragraphs.map((para, pIdx) => {
     // Nếu đoạn văn bắt đầu bằng chỉ dẫn "Read the passage..." thì không đánh số [P]
-    const isIntro = /^(?:Read\s+the|Questions?\s+\d+|Đọc\s+đoạn)/i.test(para);
+    const isIntro = /^(?:Read\s+the|Questions?\s+\d+|Đọc\s+đoạn|Attention\:|To\:)/i.test(para);
     const pMarker = !isIntro && paragraphs.length > 1
       ? `<span class="paragraph-marker" title="Đoạn văn ${pIdx + 1}">P${pIdx + 1}</span> `
       : "";
 
-    // 1. Format rich text an toàn (escape HTML, Math x^2, bold/italic)
+    // 1. Format rich text an toàn (escape HTML, Math x^2, bold/italic, tables)
     let formatted = formatRichText(para);
 
     // 2. Chuyển đổi các vị trí đục lỗ thành interactive cloze gap spans
-    // Hỗ trợ: (1), [1], {1}, ____(1)____, (1)_____, _____ (1)
+    // Hỗ trợ: (1), [1], {1}, ____(1)____, (1)_____, _____ (1), (22)__________, (23) _______
     formatted = formatted.replace(
-      /(?:_{2,}\s*\((\d+)\)\s*_{2,}|_{2,}\s*\((\d+)\)|\((\d+)\)\s*_{2,}|\[(\d+)\]|\((\d+)\)|\{(\d+)\})/g,
+      /(?:_{2,}\s*\((\d+)\)\s*_{2,}|_{2,}\s*\((\d+)\)|\((\d+)\)\s*_{1,}|\[(\d+)\]|\((\d+)\)|\{(\d+)\})/g,
       (match, g1, g2, g3, g4, g5, g6) => {
         const gapNum = parseInt(g1 || g2 || g3 || g4 || g5 || g6, 10);
         const isActive = activeGap !== null && Number(activeGap) === gapNum;
-        return `<span class="cloze-gap ${isActive ? "active-gap" : ""}" data-gap="${gapNum}" title="Vị trí đục lỗ số (${gapNum}) — Nhấp để nhảy đến câu hỏi này">(${gapNum})</span>`;
+        return `<span class="cloze-gap ${isActive ? "active-gap" : ""}" data-gap="${gapNum}" title="Vị trí đục lỗ số (${gapNum}) — Nhấp để làm câu này">(${gapNum})</span>`;
       }
     );
 

@@ -95,6 +95,26 @@ export function parseQuizData(data, fileName) {
     mainTopic = data.topic || data.title || mainTopic;
     quizType = data.type || (data.cards ? "flashcard" : quizType);
 
+    // Hỗ trợ mảng passages / readingPassages cấp root nếu có
+    if (data.passages || data.readingPassages) {
+      const passagesList = data.passages || data.readingPassages;
+      if (Array.isArray(passagesList)) {
+        passagesList.forEach((p) => {
+          const pText = p.text || p.passage || p.content || "";
+          const pTitle = p.title || p.passageTitle || "";
+          const qIds = Array.isArray(p.questionIds) ? p.questionIds : [];
+          if (pText && qIds.length > 0) {
+            rawList.forEach((q) => {
+              if (qIds.includes(q.id) && !q.passage) {
+                q.passage = pText;
+                q.passageTitle = pTitle || q.passageTitle;
+              }
+            });
+          }
+        });
+      }
+    }
+
     if (rawList[0] && !rawList[0].options && !data.type && !data.format) {
       quizType = rawList[0].front || rawList[0].term || rawList[0].word ? "flashcard" : "essay";
     }
@@ -125,6 +145,8 @@ export function parseQuizData(data, fileName) {
     mainTopic = data.topic || data.title || data.subject || mainTopic;
     list.forEach((sec, idx) => {
       const secName = sec.section || sec.part || sec.title || sec.name || `Phần ${idx + 1}`;
+      const secPassage = sec.passage || sec.readingText || sec.context || "";
+      const secPassageTitle = sec.passageTitle || sec.readingTitle || "";
       let secType = sec.type || sec.format || "";
       if (!secType) {
         const sLower = secName.toLowerCase();
@@ -135,10 +157,12 @@ export function parseQuizData(data, fileName) {
       }
       const rawQs = sec.questions || sec.items || [];
       if (Array.isArray(rawQs) && rawQs.length > 0) {
-        const normalized = rawQs.map((q, qIdx) => {
-          const qType = q.type || secType || "";
-          return normalizeQuestion({ ...q, type: qType, part: secName }, secName, qIdx, qType || "mixed");
-        });
+        const enrichedQs = rawQs.map((q) => ({
+          ...q,
+          passage: q.passage || secPassage,
+          passageTitle: q.passageTitle || secPassageTitle
+        }));
+        const normalized = normalizeQuestions(enrichedQs, secName, secType || "mixed");
         topics.push({ topic: secName, questions: normalized });
         questions.push(...normalized.map((q) => ({ ...q })));
       }
@@ -192,7 +216,34 @@ export function canonicalQuestionType(rawType) {
 }
 
 export function normalizeQuestions(questions, topic, type = "multiple_choice") {
-  return questions.map((q, index) => normalizeQuestion(q, topic, index, type));
+  let activePassage = "";
+  let activePassageTitle = "";
+  let activePassageTopic = "";
+
+  return questions.map((q, index) => {
+    let qPassage = q.passage || q.readingText || q.context || "";
+    let qPassageTitle = q.passageTitle || q.readingTitle || "";
+    const qTopic = q.topic || topic;
+
+    if (qPassage) {
+      activePassage = qPassage;
+      activePassageTitle = qPassageTitle;
+      activePassageTopic = qTopic;
+    } else if (activePassage && qTopic === activePassageTopic) {
+      const qText = q.question || q.text || "";
+      const isSameTitle = Boolean(qPassageTitle && activePassageTitle && qPassageTitle.toLowerCase() === activePassageTitle.toLowerCase());
+      const mentionsTitle = Boolean(activePassageTitle && qText.toLowerCase().includes(activePassageTitle.toLowerCase()));
+      const isReadingTopic = /reading|đọc hiểu|bài đọc|comprehension|incomplete text|cloze/i.test(qTopic);
+      const isContextRef = /based on|according to|trong bài đọc|đoạn văn trên/i.test(qText);
+
+      if (isSameTitle || mentionsTitle || (isReadingTopic && isContextRef)) {
+        qPassage = activePassage;
+        if (!qPassageTitle) qPassageTitle = activePassageTitle;
+      }
+    }
+
+    return normalizeQuestion({ ...q, passage: qPassage, passageTitle: qPassageTitle }, topic, index, type);
+  });
 }
 
 export function normalizeQuestion(q, topic, index, type = "multiple_choice") {
