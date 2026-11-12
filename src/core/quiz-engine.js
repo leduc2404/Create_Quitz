@@ -605,6 +605,7 @@ export class QuizEngine {
     quizId,
     label,
     studyMode = "practice",
+    shuffle = false,
     questions,
     index,
     score,
@@ -622,7 +623,7 @@ export class QuizEngine {
     this.quizId = quizId || null;
     this.label = label || "";
     this.studyMode = studyMode || "practice";
-    this.shuffle = Boolean(session.shuffle);
+    this.shuffle = Boolean(shuffle);
     this.questions = questions;
     this.index = Math.min(index, Math.max(questions.length - 1, 0));
     this.score = score || 0;

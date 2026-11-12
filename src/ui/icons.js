@@ -66,7 +66,25 @@ import {
   Shuffle,
   Lightbulb,
   Copy,
-  Check
+  Check,
+  Command,
+  Compass,
+  FileText,
+  Filter,
+  LayoutList,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Undo2,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  Plus,
+  ArrowRight,
+  Keyboard,
+  Trophy,
+  BookMarked,
+  Sparkle
 } from "lucide";
 export const ICONS = {
   Home,
@@ -135,7 +153,25 @@ export const ICONS = {
   Shuffle,
   Lightbulb,
   Copy,
-  Check
+  Check,
+  Command,
+  Compass,
+  FileText,
+  Filter,
+  LayoutList,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Undo2,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  Plus,
+  ArrowRight,
+  Keyboard,
+  Trophy,
+  BookMarked,
+  Sparkle
 };
 
 /** IconNode → chuỗi SVG (stroke currentColor, outline) */

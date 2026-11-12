@@ -65,3 +65,28 @@ export function dueEntries() {
 export function trackingCount() {
   return Object.values(loadMap()).filter((e) => e.box < 5 || e.due <= Date.now()).length;
 }
+
+/** Thống kê chi tiết 5 hộp Leitner để hiển thị ma trận ghi nhớ SRS */
+export function getSrsStats() {
+  const map = loadMap();
+  const now = Date.now();
+  const boxes = [0, 0, 0, 0, 0]; // Hộp 1..5
+  let due = 0;
+  let total = 0;
+
+  for (const e of Object.values(map)) {
+    if (!e || !e.q) continue;
+    total++;
+    const b = Math.max(1, Math.min(5, e.box || 1));
+    boxes[b - 1]++;
+    if (e.due <= now) due++;
+  }
+
+  return {
+    boxes,
+    due,
+    total,
+    mastered: boxes[4]
+  };
+}
+

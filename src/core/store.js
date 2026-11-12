@@ -53,6 +53,21 @@ export function removeQuiz(id) {
   persistQuizzes();
 }
 
+// Khôi phục bộ đề đã xóa (undo) — chèn lại đúng vị trí cũ nếu có thể
+export function restoreQuiz(quiz, index) {
+  const existing = state.quizzes.findIndex(
+    (q) => q.id === quiz.id || q.fileName === quiz.fileName
+  );
+  if (existing >= 0) {
+    state.quizzes[existing] = quiz;
+  } else {
+    const at = Math.max(0, Math.min(index ?? state.quizzes.length, state.quizzes.length));
+    state.quizzes.splice(at, 0, quiz);
+  }
+  persistQuizzes();
+  return quiz;
+}
+
 export function updateQuiz(id, patch) {
   const quiz = state.quizzes.find((q) => q.id === id);
   if (!quiz) return;

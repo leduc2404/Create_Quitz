@@ -1,9 +1,10 @@
-// Màn hình chọn chủ đề + chọn độ dài phiên ôn + chọn chế độ học (Practice / Exam / Flashcard 3D)
+// Màn hình chọn chủ đề (Launchpad) + chọn độ dài phiên ôn + chọn chế độ học (Practice / Exam / Flashcard 3D)
 // + Lọc dạng câu hỏi (Trắc nghiệm, Trả lời ngắn, Tự luận) + Thứ tự làm bài (Tuần tự / Xáo trộn).
 import { showScreen } from "../router.js";
 import { iconSvg } from "../icons.js";
 import { toast } from "../toast.js";
 import { getQuestionType, filterQuestionsByType } from "../../core/quiz-parser.js";
+import { escapeHtml } from "../util.js";
 
 let currentQuiz = null;
 let currentLimit = 0; // 0 = tất cả
@@ -11,8 +12,14 @@ let currentMode = "practice"; // 'practice' | 'exam' | 'flashcard'
 let currentQType = "all"; // 'all' | 'multiple_choice' | 'short_answer' | 'essay'
 let currentOrder = "sequential"; // 'sequential' | 'shuffle' (mặc định là tuần tự)
 
+const MODE_DESCRIPTIONS = {
+  practice: "Chấm đáp án và hiển thị lời giải ngay sau từng câu. Phù hợp để học hiểu sâu.",
+  exam: "Làm toàn bộ bài thi, tự do chuyển câu và chỉ công bố điểm + đáp án khi nhấn Nộp bài.",
+  flashcard: "Thẻ ghi nhớ 3D lật mặt trước/sau trực quan kết hợp tự đánh giá mức độ thuộc bài."
+};
+
 export function initTopicsView({ onAllTopics, onSelectTopic, onBack }) {
-  document.getElementById("topicBackBtn").addEventListener("click", onBack);
+  document.getElementById("topicBackBtn")?.addEventListener("click", onBack);
 
   // 1. Chọn chế độ học tập
   document.querySelectorAll("#studyModeSeg .seg-btn").forEach((btn) => {
@@ -20,6 +27,7 @@ export function initTopicsView({ onAllTopics, onSelectTopic, onBack }) {
       document.querySelectorAll("#studyModeSeg .seg-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentMode = btn.dataset.mode || "practice";
+      updateModeDesc();
     });
   });
 
@@ -53,7 +61,7 @@ export function initTopicsView({ onAllTopics, onSelectTopic, onBack }) {
   });
 
   // 5. Bắt đầu toàn bộ đề
-  document.getElementById("startAllTopicsBtn").addEventListener("click", () => {
+  document.getElementById("startAllTopicsBtn")?.addEventListener("click", () => {
     const quiz = currentQuiz;
     if (!quiz) return;
     const pool = filterQuestionsByType(quiz.questions || [], currentQType);
@@ -65,7 +73,7 @@ export function initTopicsView({ onAllTopics, onSelectTopic, onBack }) {
   });
 
   // 6. Chọn chủ đề riêng lẻ
-  document.getElementById("topicGrid").addEventListener("click", (e) => {
+  document.getElementById("topicGrid")?.addEventListener("click", (e) => {
     const card = e.target.closest(".topic-card");
     if (!card || !currentQuiz) return;
     if (card.classList.contains("disabled")) {
@@ -76,6 +84,13 @@ export function initTopicsView({ onAllTopics, onSelectTopic, onBack }) {
   });
 }
 
+function updateModeDesc() {
+  const descEl = document.getElementById("studyModeDesc");
+  if (descEl) {
+    descEl.textContent = MODE_DESCRIPTIONS[currentMode] || MODE_DESCRIPTIONS.practice;
+  }
+}
+
 function updateCountsAndUI() {
   if (!currentQuiz) return;
   const filtered = filterQuestionsByType(currentQuiz.questions || [], currentQType);
@@ -84,7 +99,7 @@ function updateCountsAndUI() {
   // Cập nhật nút Bắt đầu
   const startBtn = document.getElementById("startAllTopicsBtn");
   if (startBtn) {
-    startBtn.innerHTML = `${iconSvg("Play", 18)} Bắt đầu (${qCount} câu)`;
+    startBtn.innerHTML = `${iconSvg("Play", 18)} Bắt đầu toàn bộ đề (${qCount} câu)`;
     startBtn.disabled = qCount === 0;
   }
 
@@ -101,6 +116,8 @@ function updateCountsAndUI() {
   // Cập nhật số câu trên từng topic card
   const topicsList = Array.isArray(currentQuiz.topics) ? currentQuiz.topics : [];
   const topicGrid = document.getElementById("topicGrid");
+  if (!topicGrid) return;
+
   topicGrid.querySelectorAll(".topic-card").forEach((card) => {
     const idx = Number(card.dataset.topicIndex);
     const topic = topicsList[idx];
@@ -123,6 +140,7 @@ function updateCountsAndUI() {
 
 function renderTopicCards(quiz) {
   const topicGrid = document.getElementById("topicGrid");
+  if (!topicGrid) return;
   topicGrid.innerHTML = "";
   const topicHint = document.getElementById("topicHint");
   const topicsList = Array.isArray(quiz.topics) ? quiz.topics : [];
@@ -138,12 +156,15 @@ function renderTopicCards(quiz) {
     card.setAttribute("role", "button");
     card.tabIndex = 0;
 
-    const h3 = document.createElement("h3");
-    h3.textContent = topic.topic || `Chủ đề ${index + 1}`;
-    const p = document.createElement("p");
-    p.className = "question-count";
-    p.textContent = `...`;
-    card.append(h3, p);
+    const numStr = String(index + 1).padStart(2, "0");
+    card.innerHTML = `
+      <div class="topic-card-top">
+        <span class="topic-index-badge">CHỦ ĐỀ ${numStr}</span>
+        <span class="topic-arrow">${iconSvg("ArrowRight", 15)}</span>
+      </div>
+      <h3>${escapeHtml(topic.topic || `Chủ đề ${index + 1}`)}</h3>
+      <p class="question-count">...</p>
+    `;
 
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -166,6 +187,7 @@ export function showTopicSelection(quiz) {
   document.querySelectorAll("#studyModeSeg .seg-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.mode === "practice");
   });
+  updateModeDesc();
 
   // Reset order seg về 'sequential' (tuần tự)
   document.querySelectorAll("#orderModeSeg .seg-btn").forEach((b) => {
@@ -174,7 +196,8 @@ export function showTopicSelection(quiz) {
 
   // Tiêu đề môn học / bộ đề
   const title = quiz.mainTopic || quiz.fileName || "Bộ đề";
-  document.getElementById("subjectTitle").textContent = title.replace(/\.json$/i, "");
+  const subTitleEl = document.getElementById("subjectTitle");
+  if (subTitleEl) subTitleEl.textContent = title.replace(/\.json$/i, "");
 
   // Nhận diện tự động các dạng câu hỏi có trong bộ đề
   const allQuestions = Array.isArray(quiz.questions) ? quiz.questions : [];
@@ -206,7 +229,6 @@ export function showTopicSelection(quiz) {
   } else {
     if (qTypeFilterGroup) qTypeFilterGroup.hidden = false;
 
-    // Cập nhật text & ẩn các dạng câu hỏi không có trong đề
     if (chipAll) {
       chipAll.textContent = `Tất cả (${allQuestions.length})`;
       chipAll.classList.add("active");

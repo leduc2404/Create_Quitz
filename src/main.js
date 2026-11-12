@@ -12,7 +12,7 @@ import { showTab, initBottomNav } from "./ui/router.js";
 import { hydrateIcons } from "./ui/icons.js";
 import { initTheme } from "./ui/theme.js";
 import { toast, toastSuccess } from "./ui/toast.js";
-import { initHomeView, renderStats } from "./ui/views/home.js";
+import { initHomeView, renderStats, loadAllSampleDecks } from "./ui/views/home.js";
 import { initLibraryView } from "./ui/views/library.js";
 import { initCreateView, importJSON } from "./ui/views/create.js";
 import { filterQuestionsByType } from "./core/quiz-parser.js";
@@ -20,6 +20,7 @@ import { initProfileView } from "./ui/views/profile.js";
 import { initTopicsView, showTopicSelection } from "./ui/views/topics.js";
 import { initQuizView, enterQuizScreen } from "./ui/views/quiz.js";
 import { initResultView, showResult } from "./ui/views/result.js";
+import { initCommandPalette } from "./ui/command-palette.js";
 import { initAuthUI, syncAfterLogin } from "./auth/auth-ui.js";
 import { watchAuth } from "./auth/auth.js";
 import { initInstallPrompt } from "./pwa/install.js";
@@ -102,12 +103,25 @@ initHomeView({
   onResumeSession: resumeSession,
   onReviewDue: startDueReview,
   onImportant: startImportantReview,
-  onQuick: startQuickReview
+  onQuick: startQuickReview,
+  onStartQuiz: startQuizFlow
 });
 
 initLibraryView({ onStart: startQuizFlow });
 initCreateView();
 initProfileView();
+
+initCommandPalette({
+  onStartQuiz: startQuizFlow,
+  onQuick: startQuickReview,
+  onQuickReview: startQuickReview,
+  onReviewDue: startDueReview,
+  onDueReview: startDueReview,
+  onImportant: startImportantReview,
+  onImportantReview: startImportantReview,
+  onLoadSamples: loadAllSampleDecks,
+  onLoadSampleDecks: loadAllSampleDecks
+});
 
 initTopicsView({
   onAllTopics: (quiz, limit, mode, qType, order) => {

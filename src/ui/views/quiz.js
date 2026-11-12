@@ -84,6 +84,16 @@ export function initQuizView({ onExit, onFinish }) {
     });
   }
 
+  // Nút mở nhanh bản đồ câu hỏi dưới thanh điều hướng Mobile
+  document.getElementById("mobileMapBtn")?.addEventListener("click", () => {
+    document.getElementById("paletteToggleBtn")?.click();
+  });
+
+  // Nút nộp bài trên Desktop Side Dock
+  document.getElementById("dockSubmitExamBtn")?.addEventListener("click", () => {
+    document.getElementById("submitExamBtn")?.click();
+  });
+
   // Nút nộp bài thi (Exam Mode)
   document.getElementById("submitExamBtn")?.addEventListener("click", async () => {
     const unanswered = engine.questions.length - Object.keys(engine.userAnswers).filter(k => engine.userAnswers[k]?.value != null).length;
@@ -113,6 +123,7 @@ export function initQuizView({ onExit, onFinish }) {
     if (!key) return;
     const nowMarked = toggleImportant(key, { ...engine.current });
     syncBookmarkUi(nowMarked);
+    renderDesktopDock();
     toast(
       nowMarked ? "Đã đánh dấu câu quan trọng." : "Đã bỏ đánh dấu.",
       { duration: 1400 }
@@ -123,6 +134,7 @@ export function initQuizView({ onExit, onFinish }) {
   document.getElementById("flagBtn")?.addEventListener("click", () => {
     const isFlag = engine.toggleFlag();
     syncFlagUi(isFlag);
+    renderDesktopDock();
     toast(
       isFlag ? "Đã gắn cờ câu này để xem lại." : "Đã bỏ cờ phân vân.",
       { duration: 1400 }
@@ -177,6 +189,9 @@ export function initQuizView({ onExit, onFinish }) {
   // Bật/tắt chế độ máy nhẹ (Low-Perf / Eco mode)
   setupPerfToggle();
 
+  // Vuốt trái/phải chuyển câu trên màn hình cảm ứng (Mobile Touch Gestures)
+  setupTouchSwipeNavigation();
+
   // Phím tắt bàn phím
   setupKeyboardShortcuts();
 }
@@ -207,6 +222,7 @@ export function persistSession() {
   } else {
     engine.remainingTimer = remaining;
     saveSession(engine.serialize());
+    renderDesktopDock();
   }
 }
 
@@ -239,6 +255,10 @@ export function renderQuestion() {
   // Progress
   document.getElementById("progressFill").style.width = `${engine.progress}%`;
   document.getElementById("questionCounter").textContent = `${engine.index + 1}/${engine.total}`;
+  const mobileMapCount = document.getElementById("mobileMapCount");
+  if (mobileMapCount) mobileMapCount.textContent = `${engine.index + 1}/${engine.total}`;
+  const sessionLabel = document.getElementById("quizSessionLabel");
+  if (sessionLabel) sessionLabel.textContent = engine.label || "Phiên ôn tập";
 
   document.getElementById("questionId").textContent = question.id ? `#${question.id}` : "";
   document.getElementById("topicBadge").textContent = question.topic || "Quiz";
@@ -1769,3 +1789,146 @@ function setupPerfToggle() {
 
   syncUi();
 }
+
+// ---------- Desktop Side Dock (Workstation Live Navigator) ----------
+function renderDesktopDock() {
+  const grid = document.getElementById("desktopPaletteGrid");
+  if (!grid || engine.total === 0) return;
+
+  const isExam = engine.studyMode === "exam";
+  const isFlashcard = engine.studyMode === "flashcard";
+
+  const modePill = document.getElementById("dockModePill");
+  if (modePill) {
+    modePill.textContent = isExam ? "Thi thử" : isFlashcard ? "Flashcard 3D" : "Luyện tập";
+  }
+
+  let answeredCount = 0;
+  let correctCount = 0;
+  for (let i = 0; i < engine.total; i++) {
+    const a = engine.userAnswers[i];
+    if (a && a.value !== undefined) {
+      answeredCount++;
+      if (a.ok === true) correctCount++;
+    }
+  }
+
+  const ansEl = document.getElementById("dockAnsweredVal");
+  if (ansEl) ansEl.textContent = `${answeredCount}/${engine.total}`;
+
+  const flagEl = document.getElementById("dockFlaggedVal");
+  if (flagEl) flagEl.textContent = String(engine.flags ? engine.flags.size : 0);
+
+  const scoreEl = document.getElementById("dockScoreVal");
+  if (scoreEl) {
+    scoreEl.textContent = isExam ? "Chấm khi nộp" : `${correctCount} đúng`;
+  }
+
+  const dockSubmitBtn = document.getElementById("dockSubmitExamBtn");
+  if (dockSubmitBtn) {
+    dockSubmitBtn.hidden = !isExam;
+  }
+
+  grid.innerHTML = "";
+  for (let i = 0; i < engine.total; i++) {
+    const btn = document.createElement("button");
+    btn.className = "palette-chip";
+    btn.type = "button";
+    btn.textContent = i + 1;
+
+    if (i === engine.index) {
+      btn.classList.add("current");
+    }
+
+    const ans = engine.userAnswers[i];
+    if (ans && ans.value !== undefined) {
+      if (isExam) {
+        btn.classList.add("answered");
+      } else {
+        if (ans.ok === true) btn.classList.add("answered-correct");
+        else if (ans.ok === false) btn.classList.add("answered-wrong");
+        else btn.classList.add("answered");
+      }
+    }
+
+    if (engine.isFlagged(i)) {
+      btn.classList.add("flagged");
+    }
+
+    const q = engine.questions[i];
+    const key = q?.srsKey || (engine.quizId && q ? `${engine.quizId}:${q.id}` : null);
+    if (key && isImportant(key)) {
+      btn.classList.add("marked");
+    }
+
+    btn.addEventListener("click", () => {
+      if (i !== engine.index) {
+        engine.goTo(i);
+        renderQuestion();
+      }
+    });
+
+    grid.appendChild(btn);
+  }
+}
+
+// ---------- Vuốt cảm ứng chuyển câu trên Mobile ----------
+function setupTouchSwipeNavigation() {
+  const card = document.getElementById("questionCard");
+  if (!card) return;
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let ignoreSwipe = false;
+
+  card.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target;
+      if (
+        target.closest(".q-passage") ||
+        target.closest("input") ||
+        target.closest("textarea") ||
+        target.closest(".fc3d-card")
+      ) {
+        ignoreSwipe = true;
+        return;
+      }
+      ignoreSwipe = false;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    },
+    { passive: true }
+  );
+
+  card.addEventListener(
+    "touchend",
+    (e) => {
+      if (ignoreSwipe || e.changedTouches.length !== 1) return;
+      const sel = window.getSelection ? String(window.getSelection()) : "";
+      if (sel.trim().length > 0) return;
+
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+
+      if (Math.abs(dx) > 76 && Math.abs(dy) < 42) {
+        if (dx < 0) {
+          // Vuốt sang trái -> Câu tiếp theo (nếu nút Next đang hiển thị)
+          const nextBtn = document.getElementById("nextBtn");
+          if (nextBtn && nextBtn.classList.contains("show")) {
+            nextBtn.click();
+          }
+        } else {
+          // Vuốt sang phải -> Câu trước
+          const prevBtn = document.getElementById("prevQuestionBtn");
+          if (prevBtn && !prevBtn.disabled) {
+            prevBtn.click();
+          }
+        }
+      }
+    },
+    { passive: true }
+  );
+}
+

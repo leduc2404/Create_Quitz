@@ -17,50 +17,74 @@ const TYPE_LABELS = {
 };
 
 export function initResultView({ onRestart, onRetryWrong, onHome }) {
-  document.getElementById("restartBtn").addEventListener("click", onRestart);
-  document.getElementById("retryWrongBtn").addEventListener("click", onRetryWrong);
-  document.getElementById("homeBtn").addEventListener("click", onHome);
-  document.getElementById("shareResultBtn").addEventListener("click", () => {
+  document.getElementById("restartBtn")?.addEventListener("click", onRestart);
+  document.getElementById("retryWrongBtn")?.addEventListener("click", onRetryWrong);
+  document.getElementById("homeBtn")?.addEventListener("click", onHome);
+  document.getElementById("shareResultBtn")?.addEventListener("click", () => {
     const quiz = getQuiz(engine.quizId);
     if (quiz) shareQuiz(quiz);
   });
-  document.getElementById("wrongAnswersHeader").addEventListener("click", () => {
-    document.getElementById("wrongAnswersHeader").classList.toggle("open");
-    document.getElementById("wrongAnswersList").classList.toggle("show");
+  document.getElementById("wrongAnswersHeader")?.addEventListener("click", () => {
+    document.getElementById("wrongAnswersHeader")?.classList.toggle("open");
+    document.getElementById("wrongAnswersList")?.classList.toggle("show");
   });
-  document.getElementById("solutionHeader").addEventListener("click", () => {
-    document.getElementById("solutionHeader").classList.toggle("open");
-    document.getElementById("solutionList").classList.toggle("show");
+  document.getElementById("solutionHeader")?.addEventListener("click", () => {
+    document.getElementById("solutionHeader")?.classList.toggle("open");
+    document.getElementById("solutionList")?.classList.toggle("show");
   });
 }
 
 export function showResult() {
   const isExam = !!(engine.exam && engine.maxPoints > 0);
-  // Đề hoàn chỉnh khi: môn khớp cấu trúc chuẩn VÀ phiên này đủ 10 điểm
-  // (phiên lẻ như "Ôn 10 câu" không được hiển thị thang /10)
   const fullExam =
     isExam &&
     engine.exam.validation?.status === "complete" &&
     Math.abs(engine.maxPoints - 10) < 1e-9;
   const score = isExam ? engine.pointsScored : engine.score;
   const total = isExam ? engine.maxPoints : engine.total;
-  const percentage = total ? (score / total) * 100 : 0;
+  const percentage = total ? Math.min(100, Math.max(0, (score / total) * 100)) : 0;
 
   document.getElementById("finalScore").textContent = fmtScore(score);
   document.getElementById("totalQuestions").textContent = fullExam ? "10" : fmtScore(total);
 
-  let icon, title, message;
-  if (percentage >= 90) {
-    icon = "Award"; title = "Xuất sắc!"; message = "Bạn đã làm rất tốt! Tiếp tục phát huy nhé!";
-  } else if (percentage >= 70) {
-    icon = "TrendingUp"; title = "Tuyệt vời!"; message = "Kết quả rất tốt! Chỉ cần cố gắng thêm một chút!";
-  } else if (percentage >= 50) {
-    icon = "Zap"; title = "Khá tốt!"; message = "Hãy ôn tập thêm để đạt kết quả cao hơn!";
-  } else {
-    icon = "BookOpen"; title = "Cần cố gắng!"; message = "Đừng nản, hãy ôn tập lại và thử lại nhé!";
+  const pctBadge = document.getElementById("resultPctBadge");
+  if (pctBadge) pctBadge.textContent = `${Math.round(percentage)}%`;
+
+  // Vòng tròn tiến độ SVG (r = 58 => circumference = 2 * PI * 58 ≈ 364.42)
+  const ringFill = document.getElementById("resultRingFill");
+  if (ringFill) {
+    const circumference = 364.42;
+    const offset = circumference - (percentage / 100) * circumference;
+    ringFill.style.strokeDasharray = `${circumference}`;
+    ringFill.style.strokeDashoffset = `${circumference}`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        ringFill.style.strokeDashoffset = `${offset}`;
+      });
+    });
   }
 
-  document.getElementById("resultIcon").innerHTML = iconSvg(icon, 56);
+  let icon, title, message;
+  if (percentage >= 90) {
+    icon = "Award";
+    title = "Xuất sắc đỉnh cao!";
+    message = "Bạn đã nắm vững kiến thức một cách hoàn hảo. Tiếp tục duy trì phong độ này nhé!";
+  } else if (percentage >= 70) {
+    icon = "TrendingUp";
+    title = "Kết quả rất tốt!";
+    message = "Nền tảng kiến thức vững vàng! Hãy rà soát lại một vài câu sai để đạt điểm tuyệt đối.";
+  } else if (percentage >= 50) {
+    icon = "Zap";
+    title = "Đạt yêu cầu!";
+    message = "Bạn đã nắm được ý chính. Ôn lại các câu sai bên dưới sẽ giúp bạn bứt phá nhanh chóng.";
+  } else {
+    icon = "BookOpen";
+    title = "Cần củng cố thêm!";
+    message = "Đừng nản lòng! Hãy xem kỹ lời giải chi tiết bên dưới và bấm 'Ôn câu sai' để ghi nhớ sâu hơn.";
+  }
+
+  const iconEl = document.getElementById("resultIcon");
+  if (iconEl) iconEl.innerHTML = iconSvg(icon, 28);
   document.getElementById("resultTitle").textContent = title;
   document.getElementById("resultMessage").textContent = message;
 
@@ -86,9 +110,9 @@ export function showResult() {
     const secs = totalSeconds % 60;
     document.getElementById("totalTimeVal").textContent = `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
 
-    let paceEval = "Tối ưu 🎯";
-    if (avgPace <= 25) paceEval = "Nhanh ⚡";
-    else if (avgPace > 75) paceEval = "Cần tăng tốc ⏳";
+    let paceEval = "Tối ưu";
+    if (avgPace <= 25) paceEval = "Phản xạ nhanh";
+    else if (avgPace > 75) paceEval = "Cần tăng tốc";
     document.getElementById("paceEvalVal").textContent = paceEval;
   }
 
@@ -113,7 +137,7 @@ export function showResult() {
   renderWrongAnswers();
   renderSolutionList(isExam);
 
-  // Lưu kết quả lên cloud nếu đã đăng nhập (phục vụ thống kê sau này)
+  // Lưu kết quả lên cloud nếu đã đăng nhập
   const user = getState().user;
   if (user) {
     saveResult(user.uid, {
@@ -126,7 +150,8 @@ export function showResult() {
   }
 
   // Chỉ hiện nút share khi phiên này thuộc về một quiz trong thư viện
-  document.getElementById("shareResultBtn").hidden = !getQuiz(engine.quizId);
+  const shareBtn = document.getElementById("shareResultBtn");
+  if (shareBtn) shareBtn.hidden = !getQuiz(engine.quizId);
 
   hydrateIcons();
   showScreen("resultScreen");
@@ -206,26 +231,28 @@ function renderTopicBreakdown() {
 function renderExamSections(isExam) {
   const validation = engine.exam?.validation || null;
 
-  // TRƯỜNG HỢP 2: đề trích đoạn — vô hiệu hóa tổng điểm, cảnh báo nguyên văn
   const warning = document.getElementById("examWarning");
-  if (isExam && validation && validation.status === "partial") {
-    const subjectName = engine.exam.subject || validation.rawSubject || "chưa xác định";
-    warning.hidden = false;
-    warning.textContent =
-      `⚠️ HỆ THỐNG GHI NHẬN: Đây là đề trích đoạn / chưa đủ cấu trúc chuẩn 2026 ` +
-      `của môn ${subjectName}. Chế độ tính tổng điểm (thang 10) bị vô hiệu hóa.`;
-  } else {
-    warning.hidden = true;
+  if (warning) {
+    if (isExam && validation && validation.status === "partial") {
+      const subjectName = engine.exam.subject || validation.rawSubject || "chưa xác định";
+      warning.hidden = false;
+      warning.textContent =
+        `⚠️ HỆ THỐNG GHI NHẬN: Đây là đề trích đoạn / chưa đủ cấu trúc chuẩn 2026 ` +
+        `của môn ${subjectName}. Chế độ tính tổng điểm (thang 10) bị vô hiệu hóa.`;
+    } else {
+      warning.hidden = true;
+    }
   }
 
-  // TRƯỜNG HỢP 1: đề hoàn chỉnh — bảng điểm theo phần
   const table = document.getElementById("examScoreTable");
-  if (isExam) {
-    table.hidden = false;
-    buildExamTable(table);
-  } else {
-    table.hidden = true;
-    table.innerHTML = "";
+  if (table) {
+    if (isExam) {
+      table.hidden = false;
+      buildExamTable(table);
+    } else {
+      table.hidden = true;
+      table.innerHTML = "";
+    }
   }
 }
 
@@ -275,6 +302,7 @@ function examRow(part, earned, max) {
 function renderSolutionList(isExam) {
   const section = document.getElementById("solutionSection");
   const list = document.getElementById("solutionList");
+  if (!section || !list) return;
   const validation = engine.exam?.validation || null;
   const show = isExam && validation && validation.status === "partial";
   section.hidden = !show;
@@ -282,7 +310,7 @@ function renderSolutionList(isExam) {
     list.innerHTML = "";
     return;
   }
-  document.getElementById("solutionHeader").classList.remove("open");
+  document.getElementById("solutionHeader")?.classList.remove("open");
   list.classList.remove("show");
   list.innerHTML = "";
 
@@ -363,15 +391,18 @@ function renderWrongAnswers() {
   const section = document.getElementById("wrongAnswersSection");
   const retryBtn = document.getElementById("retryWrongBtn");
   const list = document.getElementById("wrongAnswersList");
+  const header = document.getElementById("wrongAnswersHeader");
+  if (!section || !retryBtn || !list) return;
 
-  document.getElementById("wrongAnswersHeader").classList.remove("open");
-  list.classList.remove("show");
   list.innerHTML = "";
 
   if (wrongAnswers.length > 0) {
     section.hidden = false;
     retryBtn.hidden = false;
     document.getElementById("wrongCount").textContent = wrongAnswers.length;
+    // Tự động mở danh sách câu sai để người học xem ngay
+    header?.classList.add("open");
+    list.classList.add("show");
 
     wrongAnswers.forEach((item, idx) => {
       const div = document.createElement("div");
@@ -435,6 +466,8 @@ function renderWrongAnswers() {
 
     recordWrongIds(wrongAnswers.map((w) => `${engine.quizId || "?"}:${w.id}`));
   } else {
+    header?.classList.remove("open");
+    list.classList.remove("show");
     section.hidden = true;
     retryBtn.hidden = true;
   }

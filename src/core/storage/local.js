@@ -92,6 +92,24 @@ export function saveTheme(theme) {
   localStorage.setItem(KEYS.theme, theme);
 }
 
+// ---------- Mục tiêu số câu mỗi ngày (Daily Goal) ----------
+export function getDailyGoal() {
+  const n = parseInt(localStorage.getItem(`${PREFIX}daily_goal`), 10);
+  if (Number.isFinite(n) && n >= 5 && n <= 200) return n;
+  return 20;
+}
+
+export function saveDailyGoal(n) {
+  const clamped = Math.max(5, Math.min(200, Math.round(Number(n) || 20)));
+  localStorage.setItem(`${PREFIX}daily_goal`, String(clamped));
+  return clamped;
+}
+
+// ---------- Bản đồ hoạt động hàng ngày (Activity Heatmap) ----------
+export function getActivityMap() {
+  return safeGet(`${PREFIX}activity`, {});
+}
+
 // ---------- Thống kê Streak & Hoạt động hàng ngày ----------
 export function getStudyStats() {
   const today = new Date().toISOString().slice(0, 10);
@@ -124,6 +142,14 @@ export function recordStudyActivity(count = 1) {
   }
 
   safeSet(`${PREFIX}study_stats`, { lastDate: today, streak, todayCount });
+
+  // Ghi nhận vào bản đồ hoạt động để dựng heatmap (giữ 370 ngày gần nhất)
+  const activity = safeGet(`${PREFIX}activity`, {});
+  activity[today] = (activity[today] || 0) + count;
+  const keys = Object.keys(activity).sort();
+  while (keys.length > 370) delete activity[keys.shift()];
+  safeSet(`${PREFIX}activity`, activity);
+
   return { streak, todayCount };
 }
 

@@ -2,7 +2,12 @@
 // các tính năng auth/cloud tự tắt thay vì crash.
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "firebase/firestore";
 
 const env = import.meta.env;
 
@@ -26,11 +31,16 @@ let db = null;
 if (isFirebaseEnabled) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
-  // Offline-first: cache Firestore trong IndexedDB
-  enableIndexedDbPersistence(db).catch((err) => {
-    console.warn("Không bật được offline persistence:", err.code);
-  });
+  // Offline-first: cache Firestore trong IndexedDB, hỗ trợ nhiều tab.
+  // Nếu trình duyệt chặn (ẩn danh / in-app) thì chuyển về cache tạm.
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch (err) {
+    console.warn("[Quitz] Firestore offline cache không khả dụng, dùng cache tạm:", err?.code);
+    db = getFirestore(app);
+  }
 } else {
   console.info(
     "[Quitz] Firebase chưa cấu hình (thiếu .env). Chạy chế độ local: đăng nhập & cloud bị tắt."

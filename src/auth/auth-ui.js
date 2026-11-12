@@ -1,8 +1,9 @@
-// UI đăng nhập/đăng ký — modal + nút trên topbar.
+// UI đăng nhập/đăng ký — modal + nút trên topbar & desktop sidebar.
 import {
   friendlyAuthError,
   isAuthAvailable,
   logOut,
+  resolveRedirectResult,
   signInWithEmail,
   signInWithGoogle,
   signUpWithEmail
@@ -21,43 +22,58 @@ export function initAuthUI() {
   const authBtn = document.getElementById("authBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const profileAuthBtn = document.getElementById("profileAuthBtn");
+  const sidebarUserBtn = document.getElementById("sidebarUserBtn");
 
   // Luôn gắn nút đóng / backdrop để modal KHÔNG BAO GIỜ bị kẹt mở
-  // (kể cả khi Firebase chưa cấu hình và initAuthUI return sớm)
-  document.getElementById("authClose").addEventListener("click", closeAuthModal);
-  modal.addEventListener("click", (e) => {
+  document.getElementById("authClose")?.addEventListener("click", closeAuthModal);
+  modal?.addEventListener("click", (e) => {
     if (e.target === modal) closeAuthModal();
   });
 
   if (!isAuthAvailable()) {
-    // Chưa cấu hình Firebase: ẩn toàn bộ khu vực auth
-    authBtn.hidden = true;
-    logoutBtn.hidden = true;
-    profileAuthBtn.hidden = true;
+    // Chưa cấu hình Firebase: ẩn các nút đăng nhập cloud, nhưng sidebar user card dẫn tới Hồ sơ
+    if (authBtn) authBtn.hidden = true;
+    if (logoutBtn) logoutBtn.hidden = true;
+    if (profileAuthBtn) profileAuthBtn.hidden = true;
+    sidebarUserBtn?.addEventListener("click", () => showTab("profileScreen"));
     return;
   }
-  // Firebase đã cấu hình: đảm bảo nút đăng nhập hiện ra
-  // (phòng trường hợp hidden còn sót từ lần khởi tạo trước)
-  authBtn.hidden = false;
 
-  authBtn.addEventListener("click", () => {
+  if (authBtn) authBtn.hidden = false;
+
+  const handleUserAction = () => {
     if (getState().user) {
       showTab("profileScreen");
       return;
     }
     openAuthModal();
-  });
-  profileAuthBtn.addEventListener("click", openAuthModal);
+  };
 
-  logoutBtn.addEventListener("click", async () => {
+  authBtn?.addEventListener("click", handleUserAction);
+  sidebarUserBtn?.addEventListener("click", handleUserAction);
+  profileAuthBtn?.addEventListener("click", openAuthModal);
+
+  logoutBtn?.addEventListener("click", async () => {
     await logOut();
     toast("Đã đăng xuất. Dữ liệu cloud vẫn được giữ an toàn.", { type: "info" });
   });
 
-  document.getElementById("tabLogin").addEventListener("click", () => setMode("login"));
-  document.getElementById("tabSignup").addEventListener("click", () => setMode("signup"));
+  document.getElementById("tabLogin")?.addEventListener("click", () => setMode("login"));
+  document.getElementById("tabSignup")?.addEventListener("click", () => setMode("signup"));
 
-  document.getElementById("authForm").addEventListener("submit", async (e) => {
+  // Hiện / ẩn mật khẩu
+  const pwToggle = document.getElementById("pwToggle");
+  const pwInput = document.getElementById("authPassword");
+  pwToggle?.addEventListener("click", () => {
+    const show = pwInput.type === "password";
+    pwInput.type = show ? "text" : "password";
+    pwToggle.setAttribute("aria-pressed", String(show));
+    pwToggle.setAttribute("aria-label", show ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+    pwToggle.innerHTML = iconSvg(show ? "EyeOff" : "Eye", 18);
+    pwInput.focus();
+  });
+
+  document.getElementById("authForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("authEmail").value.trim();
     const password = document.getElementById("authPassword").value;
@@ -82,12 +98,17 @@ export function initAuthUI() {
     }
   });
 
-  document.getElementById("googleBtn").addEventListener("click", async () => {
+  document.getElementById("googleBtn")?.addEventListener("click", async () => {
     setSubmitting(true);
     try {
-      await signInWithGoogle();
-      toastSuccess("Đăng nhập với Google thành công!");
-      closeAuthModal();
+      const user = await signInWithGoogle();
+      if (user) {
+        toastSuccess("Đăng nhập với Google thành công!");
+        closeAuthModal();
+      } else {
+        // Đang điều hướng sang Google (redirect); giữ nút ở trạng thái chờ
+        toast("Đang chuyển hướng đến Google...", { type: "info", duration: 2500 });
+      }
     } catch (err) {
       showAuthError(friendlyAuthError(err));
     } finally {
@@ -95,23 +116,34 @@ export function initAuthUI() {
     }
   });
 
-  // Cập nhật header + thẻ profile theo trạng thái user
+  // Hoàn tất đăng nhập Google bằng redirect nếu trang vừa quay về từ Firebase
+  resolveRedirectResult()
+    .then((user) => {
+      if (user) toastSuccess("Đăng nhập với Google thành công!");
+    })
+    .catch((err) => {
+      openAuthModal();
+      showAuthError(friendlyAuthError(err));
+    });
+
+  // Cập nhật header + sidebar + thẻ profile theo trạng thái user
   subscribe("user", (user) => renderUser(user));
 }
 
 export function openAuthModal() {
   clearAuthError();
-  document.getElementById("authModal").classList.add("open");
+  document.getElementById("authModal")?.classList.add("open");
+  setTimeout(() => document.getElementById("authEmail")?.focus(), 60);
 }
 
 function closeAuthModal() {
-  document.getElementById("authModal").classList.remove("open");
+  document.getElementById("authModal")?.classList.remove("open");
 }
 
 function setMode(newMode) {
   mode = newMode;
-  document.getElementById("tabLogin").classList.toggle("active", mode === "login");
-  document.getElementById("tabSignup").classList.toggle("active", mode === "signup");
+  document.getElementById("tabLogin")?.classList.toggle("active", mode === "login");
+  document.getElementById("tabSignup")?.classList.toggle("active", mode === "signup");
   document.getElementById("authTitle").textContent = mode === "login" ? "Đăng nhập" : "Đăng ký";
   document.getElementById("authSubmit").textContent = mode === "login" ? "Đăng nhập" : "Tạo tài khoản";
   document.getElementById("authPassword").autocomplete =
@@ -121,17 +153,25 @@ function setMode(newMode) {
 
 function showAuthError(msg) {
   const el = document.getElementById("authError");
+  if (!el) return;
   el.textContent = msg;
   el.hidden = false;
 }
 
 function clearAuthError() {
-  document.getElementById("authError").hidden = true;
+  const el = document.getElementById("authError");
+  if (el) el.hidden = true;
 }
 
 function setSubmitting(busy) {
-  document.getElementById("authSubmit").disabled = busy;
-  document.getElementById("googleBtn").disabled = busy;
+  const sub = document.getElementById("authSubmit");
+  const gBtn = document.getElementById("googleBtn");
+  if (sub) {
+    sub.disabled = busy;
+    sub.classList.toggle("is-loading", busy);
+    sub.textContent = busy ? "Đang xử lý..." : mode === "login" ? "Đăng nhập" : "Tạo tài khoản";
+  }
+  if (gBtn) gBtn.disabled = busy;
 }
 
 function renderUser(user) {
@@ -142,26 +182,42 @@ function renderUser(user) {
   const emailEl = document.getElementById("profileEmail");
   const profileAuthBtn = document.getElementById("profileAuthBtn");
 
+  const sidebarAvatar = document.getElementById("sidebarAvatar");
+  const sidebarUserName = document.getElementById("sidebarUserName");
+  const sidebarUserSub = document.getElementById("sidebarUserSub");
+
   if (user) {
     const name = user.displayName || (user.email ? user.email.split("@")[0] : "Người dùng");
     const initial = name.charAt(0).toUpperCase();
-    authBtn.hidden = false;
-    authBtn.innerHTML = `<span class="avatar-letter">${initial}</span>`;
-    authBtn.setAttribute("aria-label", `Tài khoản: ${name}`);
-    avatar.textContent = initial;
-    nameEl.textContent = name;
-    emailEl.textContent = user.email || "Đã đăng nhập";
-    profileAuthBtn.hidden = true;
-    logoutBtn.hidden = false;
+    if (authBtn) {
+      authBtn.hidden = false;
+      authBtn.innerHTML = `<span class="avatar-letter">${initial}</span>`;
+      authBtn.setAttribute("aria-label", `Tài khoản: ${name}`);
+    }
+    if (avatar) avatar.textContent = initial;
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = user.email || "Đã đăng nhập Cloud";
+    if (profileAuthBtn) profileAuthBtn.hidden = true;
+    if (logoutBtn) logoutBtn.hidden = false;
+
+    if (sidebarAvatar) sidebarAvatar.textContent = initial;
+    if (sidebarUserName) sidebarUserName.textContent = name;
+    if (sidebarUserSub) sidebarUserSub.textContent = "Đã đồng bộ Cloud";
   } else {
-    authBtn.hidden = false;
-    authBtn.innerHTML = iconSvg("User", 18);
-    authBtn.setAttribute("aria-label", "Đăng nhập");
-    avatar.innerHTML = iconSvg("User", 22);
-    nameEl.textContent = "Khách";
-    emailEl.textContent = "Đăng nhập để đồng bộ cloud";
-    profileAuthBtn.hidden = false;
-    logoutBtn.hidden = true;
+    if (authBtn) {
+      authBtn.hidden = !isAuthAvailable();
+      authBtn.innerHTML = iconSvg("User", 18);
+      authBtn.setAttribute("aria-label", "Đăng nhập");
+    }
+    if (avatar) avatar.innerHTML = iconSvg("User", 22);
+    if (nameEl) nameEl.textContent = "Khách";
+    if (emailEl) emailEl.textContent = "Lưu trữ cục bộ • Đăng nhập để đồng bộ Cloud";
+    if (profileAuthBtn) profileAuthBtn.hidden = !isAuthAvailable();
+    if (logoutBtn) logoutBtn.hidden = true;
+
+    if (sidebarAvatar) sidebarAvatar.innerHTML = iconSvg("User", 16);
+    if (sidebarUserName) sidebarUserName.textContent = "Chế độ Khách";
+    if (sidebarUserSub) sidebarUserSub.textContent = "Lưu cục bộ trên máy";
   }
 }
 

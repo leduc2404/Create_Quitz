@@ -55,5 +55,11 @@ export default defineConfig({
   ],
   build: {
     target: "es2020"
+  },
+  server: {
+    // localhost nằm trong Authorized domains mặc định của Firebase Auth;
+    // 127.0.0.1 thì không, khiến đăng nhập Google bị từ chối.
+    host: "localhost",
+    port: 5173
   }
 });
