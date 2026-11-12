@@ -168,6 +168,27 @@ export function initQuizView({ onExit, onFinish }) {
     toast(next ? "Đã bật âm thanh." : "Đã tắt âm thanh.", { duration: 1200 });
   });
 
+  // Mobile: gom công cụ phụ vào menu "..." để gọn thanh điều khiển
+  const toolsMoreBtn = document.getElementById("quizToolsMoreBtn");
+  const toolsSecondary = document.getElementById("quizToolsSecondary");
+  if (toolsMoreBtn && toolsSecondary) {
+    const closeTools = () => {
+      toolsSecondary.classList.remove("open");
+      toolsMoreBtn.setAttribute("aria-expanded", "false");
+    };
+    toolsMoreBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = toolsSecondary.classList.toggle("open");
+      toolsMoreBtn.setAttribute("aria-expanded", String(open));
+    });
+    toolsSecondary.addEventListener("click", () => closeTools());
+    document.addEventListener("click", (e) => {
+      if (!toolsSecondary.classList.contains("open")) return;
+      if (toolsSecondary.contains(e.target) || toolsMoreBtn.contains(e.target)) return;
+      closeTools();
+    });
+  }
+
   // Cỡ chữ A- / A+
   setupFontResizer();
 
@@ -333,14 +354,20 @@ export function renderQuestion() {
     }
   }
 
-  // Nút Next CTA
+  // Thanh hành động cố định dưới đáy: chế độ + trạng thái nút Next
+  const navBar = document.getElementById("quizNavBar");
+  if (navBar) navBar.dataset.mode = engine.studyMode;
   const nextBtn = document.getElementById("nextBtn");
   if (isExam || isFlashcard) {
     nextBtn.classList.add("show");
-    nextBtn.textContent = engine.index === engine.total - 1 ? "Xem lại bài" : "Câu tiếp theo";
+    nextBtn.disabled = false;
+    setNextLabel(engine.index === engine.total - 1 ? "Xem lại bài" : "Câu tiếp theo");
+  } else if (engine.answered) {
+    showNextCta();
   } else {
-    if (engine.answered) showNextCta();
-    else nextBtn.classList.remove("show");
+    nextBtn.classList.remove("show");
+    nextBtn.disabled = true;
+    setNextLabel("Câu tiếp theo");
   }
 
   // Replay animation
@@ -547,15 +574,8 @@ function renderMultipleChoice(container, question, isExam = false) {
         persistSession();
       });
     } else {
-      // Trong chế độ Luyện tập: Hiện đúng/sai ngay
-      if (currentAnswer) {
-        btn.classList.add("disabled");
-        const isThisAnswer = option === question.answer || cleaned.text === question.answer;
-        if (isThisAnswer) btn.classList.add("correct");
-        if (currentAnswer.value === option) {
-          btn.classList.add(currentAnswer.ok ? "correct" : "incorrect");
-        }
-      } else {
+      // Trong chế độ Luyện tập: chỉ gắn click khi chưa trả lời
+      if (!currentAnswer) {
         btn.addEventListener("click", () => selectOption(btn, option));
       }
     }
@@ -563,8 +583,9 @@ function renderMultipleChoice(container, question, isExam = false) {
     container.appendChild(btn);
   });
 
-  // Trong chế độ Luyện tập: Nếu câu đã được trả lời trước đó, hiển thị thẻ giải thích
+  // Trong chế độ Luyện tập: Nếu câu đã được trả lời trước đó, tô lại đáp án + hiện giải thích
   if (!isExam && currentAnswer) {
+    applyOptionFeedback(container, question, currentAnswer.value);
     showQuestionExplanation({
       question,
       userChoice: currentAnswer.value,
@@ -572,6 +593,33 @@ function renderMultipleChoice(container, question, isExam = false) {
       animate: false
     });
   }
+}
+
+/**
+ * Phản hồi trực tiếp trên từng thẻ đáp án: đáp án đúng tô xanh + dấu ✓,
+ * đáp án chọn sai tô đỏ + dấu ✕.
+ */
+function applyOptionFeedback(container, question, selectedOption) {
+  if (!container) return;
+  const alphabet = "ABCDEFGH";
+  const resolvedCorrect = resolveOptionDetails(question, question.answer);
+  const resolvedSelected = resolveOptionDetails(question, selectedOption);
+  const correctIdx = resolvedCorrect.letter ? alphabet.indexOf(resolvedCorrect.letter) : -1;
+  const selectedIdx = resolvedSelected.letter ? alphabet.indexOf(resolvedSelected.letter) : -1;
+
+  container.querySelectorAll(".option-btn").forEach((btn, idx) => {
+    btn.classList.add("disabled");
+    btn.classList.remove("active");
+    const isCorrect = idx === correctIdx;
+    const isWrongSelected = idx === selectedIdx && !isCorrect;
+    btn.classList.toggle("correct", isCorrect);
+    btn.classList.toggle("incorrect", isWrongSelected);
+    const keyEl = btn.querySelector(".option-key");
+    if (keyEl) {
+      if (isCorrect) keyEl.innerHTML = iconSvg("Check", 15);
+      else if (isWrongSelected) keyEl.innerHTML = iconSvg("X", 15);
+    }
+  });
 }
 
 function selectOption(btn, selectedOption) {
@@ -587,16 +635,8 @@ function selectOption(btn, selectedOption) {
   recordReview(srsKey, result, { ...engine.current });
 
   const question = engine.current;
-  document.querySelectorAll(".option-btn").forEach((b) => {
-    b.classList.add("disabled");
-    const label = b.querySelector(".option-label")?.textContent?.trim() || b.textContent.trim();
-    const isCorrect =
-      b.textContent === question.answer ||
-      label === question.answer ||
-      cleanOptionPrefix(label).text === cleanOptionPrefix(question.answer).text;
-    if (isCorrect) b.classList.add("correct");
-  });
-  btn.classList.add(result ? "correct" : "incorrect");
+  const optionsContainer = btn.closest(".options-container") || document.getElementById("optionsContainer");
+  applyOptionFeedback(optionsContainer, question, selectedOption);
 
   // Hiển thị thẻ gợi ý / giải thích phía dưới đẹp mắt chuẩn phong cách Flashcard 3D
   showQuestionExplanation({
@@ -656,6 +696,24 @@ export function hideQuestionExplanation() {
 }
 
 /**
+ * Định dạng đáp án chuẩn: nếu nhiều ý ngăn bởi gạch ngang / xuống dòng thì tách thành bullet
+ */
+function formatAnswerDisplay(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  const parts = raw
+    .split(/\n+|\s+[–—-]\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return `<ul class="q-exp-answer-list">${parts
+      .map((p) => `<li>${escapeHtml(p)}</li>`)
+      .join("")}</ul>`;
+  }
+  return escapeHtml(raw);
+}
+
+/**
  * Hiển thị ô giải thích / gợi ý đơn giản, đẹp mắt dưới câu hỏi
  */
 export function showQuestionExplanation({
@@ -663,7 +721,8 @@ export function showQuestionExplanation({
   userChoice = null,
   isCorrect = false,
   animate = true,
-  customAnswerSummary = ""
+  customAnswerSummary = "",
+  acceptableAnswers = []
 }) {
   // Không làm lộ đáp án trong chế độ Thi thử (Exam Mode)
   if (engine.studyMode === "exam") return;
@@ -709,45 +768,35 @@ export function showQuestionExplanation({
     statusLabel = "Chưa chính xác";
   }
 
-  // 2. Xác định Đáp án đúng chính xác để hiển thị nổi bật
-  let answerBadgeHtml = "";
-  if (customAnswerSummary) {
-    answerBadgeHtml = `
-      <div class="q-exp-answer-pill">
-        <span class="q-exp-answer-label">Đáp án:</span>
-        <span class="q-exp-key-badge no-letter">
-          <span class="q-exp-key-text">${escapeHtml(customAnswerSummary)}</span>
-        </span>
-      </div>
-    `;
-  } else {
+  // 2. Trắc nghiệm: đáp án đúng đã được tô xanh ngay trong danh sách,
+  //    chỉ bổ sung chữ cái đúng vào tiêu đề khi người dùng chọn sai.
+  if (!customAnswerSummary && !isCorrect && userChoice !== "(Đã tự xem đáp án)") {
     const resolvedAns = resolveOptionDetails(question, question.answer);
     if (resolvedAns.letter) {
-      answerBadgeHtml = `
-        <div class="q-exp-answer-pill">
-          <span class="q-exp-answer-label">Đáp án đúng:</span>
-          <span class="q-exp-key-badge">
-            <span class="q-exp-letter-char">${escapeHtml(resolvedAns.letter)}</span>
-            <span class="q-exp-key-text">${escapeHtml(resolvedAns.text || resolvedAns.full)}</span>
-          </span>
-        </div>
-      `;
-    } else {
-      const ansVal = resolvedAns.full || question.answer || "";
-      if (ansVal) {
-        answerBadgeHtml = `
-          <div class="q-exp-answer-pill">
-            <span class="q-exp-answer-label">Đáp án đúng:</span>
-            <span class="q-exp-key-badge no-letter">
-              <span class="q-exp-key-text">${escapeHtml(ansVal)}</span>
-            </span>
-          </div>
-        `;
-      }
+      statusLabel = `Chưa chính xác — Đáp án đúng là ${resolvedAns.letter}`;
     }
   }
 
-  // 3. Nội dung giải thích & gợi ý
+  // 3. Đáp án chuẩn (xếp dọc) cho trả lời ngắn / đúng-sai.
+  //    Khi kết quả đúng, chỉ hiển thị giải thích để tránh lặp lại đáp án vừa trả lời.
+  let answerSectionHtml = "";
+  if (customAnswerSummary && !isCorrect) {
+    const alts = (Array.isArray(acceptableAnswers) ? acceptableAnswers : [])
+      .map((a) => String(a || "").trim())
+      .filter((a) => a && a !== String(customAnswerSummary).trim());
+    const altTags = alts
+      .map((a) => `<span class="q-exp-alt-tag">${escapeHtml(a)}</span>`)
+      .join("");
+    answerSectionHtml = `
+      <div class="q-exp-answer-section">
+        <div class="q-exp-section-label">ĐÁP ÁN CHÍNH XÁC</div>
+        <div class="q-exp-answer-value">${formatAnswerDisplay(customAnswerSummary)}</div>
+        ${altTags ? `<div class="q-exp-alt-row"><span class="q-exp-alt-label">Cách viết khác:</span>${altTags}</div>` : ""}
+      </div>
+    `;
+  }
+
+  // 4. Nội dung giải thích & gợi ý
   let bodyContentHtml = "";
   if (explanation) {
     bodyContentHtml += `<div class="q-exp-text">${formatRichText(explanation)}</div>`;
@@ -766,7 +815,7 @@ export function showQuestionExplanation({
         <span class="q-exp-hint-content">${formatRichText(hint)}</span>
       </div>
     `;
-  } else {
+  } else if (!customAnswerSummary) {
     const resolvedAns = resolveOptionDetails(question, question.answer);
     const ansFallback = resolvedAns.full || question.answer || "";
     if (ansFallback) {
@@ -776,9 +825,13 @@ export function showQuestionExplanation({
         </div>
       `;
     }
+  } else if (isCorrect) {
+    bodyContentHtml += `
+      <div class="q-exp-empty-note">Bạn đã ghi nhớ chính xác câu này.</div>
+    `;
   }
 
-  if (!answerBadgeHtml && !bodyContentHtml) {
+  if (!answerSectionHtml && !bodyContentHtml) {
     wrap.hidden = true;
     return;
   }
@@ -799,9 +852,9 @@ export function showQuestionExplanation({
           ${statusIcon}
           <span>${statusLabel}</span>
         </div>
-        ${answerBadgeHtml}
       </div>
-      ${bodyContentHtml ? `<div class="q-exp-body">${bodyContentHtml}</div>` : ""}
+      ${answerSectionHtml}
+      ${bodyContentHtml ? `<div class="q-exp-body ${answerSectionHtml ? "q-exp-body-divider" : ""}">${answerSectionHtml ? `<div class="q-exp-section-label">GIẢI THÍCH CHI TIẾT</div>` : ""}${bodyContentHtml}</div>` : ""}
     </div>
   `;
 
@@ -862,13 +915,17 @@ function renderFlashcard3D(question) {
   const frontText = document.getElementById("fcFrontText");
   const backText = document.getElementById("fcBackText");
 
-  if (frontText) frontText.innerHTML = formatRichText(question.question);
+  if (frontText) {
+    frontText.innerHTML = formatRichText(question.question);
+    frontText.scrollTop = 0;
+  }
   if (backText) {
     let sol = question.answer;
     if (question.explanation) {
       sol += `\n\n**Lời giải chi tiết:**\n${question.explanation}`;
     }
     backText.innerHTML = formatRichText(sol);
+    backText.scrollTop = 0;
   }
 }
 
@@ -1266,6 +1323,11 @@ function renderShortAnswer(container, question, isExam = false) {
       }
     });
 
+    const fieldLabel = document.createElement("div");
+    fieldLabel.className = "short-field-label";
+    fieldLabel.innerHTML = `<span class="short-field-title">Câu trả lời của bạn</span>`;
+    box.appendChild(fieldLabel);
+
     inputWrap.appendChild(submitBtn);
     box.appendChild(inputWrap);
 
@@ -1288,6 +1350,7 @@ function renderShortAnswer(container, question, isExam = false) {
     if (currentAnswer) {
       input.disabled = true;
       submitBtn.disabled = true;
+      submitBtn.style.display = "none";
       revealBtn.disabled = true;
       inputWrap.classList.add(currentAnswer.ok ? "is-correct" : "is-incorrect");
       showShortFeedback(container, question, { ok: currentAnswer.ok });
@@ -1326,13 +1389,6 @@ function revealShortAnswer(container, question) {
 
   card.append(head, ans);
 
-  if (Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0) {
-    const acc = document.createElement("div");
-    acc.className = "short-reveal-acceptable";
-    acc.textContent = `Chấp nhận các cách viết: ${question.acceptableAnswers.join(", ")}`;
-    card.appendChild(acc);
-  }
-
   // Hàng nút tự đánh giá cho người học (tự nhận diện đúng / cần ôn lại)
   const gradeRow = document.createElement("div");
   gradeRow.className = "short-grade-row";
@@ -1349,6 +1405,10 @@ function revealShortAnswer(container, question) {
 
   const finalize = (isCorrect) => {
     gradeRow.remove();
+    // Bỏ thẻ xem trước + ô nhập; thẻ giải thích bên dưới sẽ hiển thị đầy đủ
+    card.remove();
+    inputWrap?.remove();
+    container.querySelector(".short-field-label")?.remove();
     const srsKey = engine.currentKey();
     const result = engine.answerShortAnswer(isCorrect ? question.answer : "");
     recordStudyActivity(1);
@@ -1362,16 +1422,13 @@ function revealShortAnswer(container, question) {
     if (timerCfg && timerCfg.enabled && timerCfg.mode === "question") stopTimer();
     recordReview(srsKey, isCorrect, { ...question });
 
-    const acceptable = Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0
-      ? ` (chấp nhận: ${question.acceptableAnswers.join(", ")})`
-      : "";
-
     showQuestionExplanation({
       question,
       userChoice: isCorrect ? question.answer : "(Đã tự xem đáp án)",
       isCorrect,
       animate: true,
-      customAnswerSummary: question.answer + acceptable
+      customAnswerSummary: question.answer,
+      acceptableAnswers: question.acceptableAnswers || []
     });
 
     showNextCta();
@@ -1422,23 +1479,34 @@ function showShortFeedback(container, question, result) {
   const submitBtn = container.querySelector(".short-submit-btn");
   const actionsBar = container.querySelector(".short-actions-bar");
   if (input) input.disabled = true;
-  if (submitBtn) submitBtn.disabled = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "none";
+  }
   if (actionsBar) actionsBar.style.display = "none";
   if (inputWrap) {
     inputWrap.classList.remove("is-correct", "is-incorrect");
     inputWrap.classList.add(result.ok ? "is-correct" : "is-incorrect");
   }
 
-  const acceptable = Array.isArray(question.acceptableAnswers) && question.acceptableAnswers.length > 0
-    ? ` (chấp nhận: ${question.acceptableAnswers.join(", ")})`
-    : "";
+  // Nhãn + trạng thái đúng/sai cho câu trả lời của người học
+  const fieldLabel = container.querySelector(".short-field-label");
+  if (fieldLabel) {
+    fieldLabel.classList.remove("is-ok", "is-bad");
+    fieldLabel.classList.add(result.ok ? "is-ok" : "is-bad");
+    fieldLabel.innerHTML = `
+      <span class="short-field-title">Câu trả lời của bạn</span>
+      <span class="short-field-status">${result.ok ? "✓ Chính xác" : "✕ Chưa chính xác"}</span>
+    `;
+  }
 
   showQuestionExplanation({
     question,
     userChoice: input ? input.value : null,
     isCorrect: result.ok,
     animate: true,
-    customAnswerSummary: question.answer + acceptable
+    customAnswerSummary: question.answer,
+    acceptableAnswers: question.acceptableAnswers || []
   });
 }
 
@@ -1456,8 +1524,14 @@ function questionType(question) {
 
 function showNextCta() {
   const nextBtn = document.getElementById("nextBtn");
-  nextBtn.textContent = engine.index === engine.total - 1 ? "Xem kết quả" : "Câu tiếp theo";
+  nextBtn.disabled = false;
+  setNextLabel(engine.index === engine.total - 1 ? "Xem kết quả" : "Câu tiếp theo");
   nextBtn.classList.add("show");
+}
+
+function setNextLabel(text) {
+  const nextBtn = document.getElementById("nextBtn");
+  nextBtn.innerHTML = `<span>${text}</span>${iconSvg("ArrowRight", 17)}`;
 }
 
 function goNext(onFinish) {

@@ -1,8 +1,7 @@
-// Tab Home — Trung tâm điều hành học tập (Bento Grid, SRS 5-Box Matrix, Starter Decks, Daily Goal).
+// Tab Home — Trung tâm điều hành học tập (Bento Grid, Starter Decks, Daily Goal).
 import { addQuiz, getState, subscribe, unsyncedQuizzes, updateQuiz } from "../../core/store.js";
 import { saveQuizToCloud } from "../../core/storage/cloud.js";
 import { loadSession, clearSession, getStudyStats, getAttemptsForQuiz, genId, getDailyGoal } from "../../core/storage/local.js";
-import { dueEntries, getSrsStats } from "../../core/srs.js";
 import { importantCount } from "../../core/flags.js";
 import { parseQuizData } from "../../core/quiz-parser.js";
 import { SAMPLE_DECKS, countDeckQuestions } from "../../core/sample-decks.js";
@@ -51,22 +50,17 @@ export function loadAllSampleDecks() {
 /**
  * @param {object} hooks
  *  - onResumeSession(): tiếp tục phiên dở (engine.restore + enterQuizScreen)
- *  - onReviewDue(): ôn câu đến hạn SRS
  *  - onImportant(): ôn câu quan trọng (bookmark)
  *  - onQuick(n): ôn nhanh n câu
  *  - onStartQuiz(quiz): mở màn chọn chủ đề của bộ đề
  */
-export function initHomeView({ onResumeSession, onReviewDue, onImportant, onQuick, onStartQuiz }) {
+export function initHomeView({ onResumeSession, onImportant, onQuick, onStartQuiz }) {
   startQuizHandler = onStartQuiz;
 
   document.getElementById("quickStartBtn")?.addEventListener("click", () => {
     const session = loadSession();
     if (session && session.questions && session.questions.length > 0) {
       onResumeSession();
-      return;
-    }
-    if (dueEntries().length > 0) {
-      onReviewDue();
       return;
     }
     if (getState().quizzes.length > 0) {
@@ -87,7 +81,6 @@ export function initHomeView({ onResumeSession, onReviewDue, onImportant, onQuic
   });
 
   document.getElementById("quickTenBtn")?.addEventListener("click", () => onQuick(10));
-  document.getElementById("reviewDueBtn")?.addEventListener("click", onReviewDue);
   document.getElementById("importantBtn")?.addEventListener("click", onImportant);
 
   document.getElementById("homeAiStudioBtn")?.addEventListener("click", () => {
@@ -147,10 +140,9 @@ function updateGreeting() {
   }
 }
 
-// ---------- Stats + SRS Matrix + Starter Decks ----------
+// ---------- Stats + Starter Decks ----------
 export function renderStats() {
   const quizzes = getState().quizzes;
-  const due = dueEntries().length;
   const flagged = importantCount();
   const { streak, todayCount } = getStudyStats();
   const DAILY_TARGET = getDailyGoal();
@@ -188,14 +180,6 @@ export function renderStats() {
   if (sidebarGoalVal) sidebarGoalVal.textContent = `${todayCount}/${DAILY_TARGET} câu`;
   if (sidebarGoalFill) sidebarGoalFill.style.width = `${pct}%`;
 
-  // Các nút ôn nhanh
-  const dueBtn = document.getElementById("reviewDueBtn");
-  if (dueBtn) {
-    dueBtn.hidden = due === 0;
-    const duePill = document.getElementById("duePill");
-    if (duePill) duePill.textContent = due;
-  }
-
   const importantBtn = document.getElementById("importantBtn");
   if (importantBtn) {
     importantBtn.hidden = flagged === 0;
@@ -203,39 +187,16 @@ export function renderStats() {
     if (impPill) impPill.textContent = flagged;
   }
 
-  // Hero subtitle
+  // Hero subtitle — câu khích lệ học tập
   const quickSub = document.getElementById("quickSub");
   if (quickSub) {
     quickSub.textContent =
-      due > 0
-        ? `Bạn có ${due} câu đến hạn ôn tập ngắt quãng (SRS) cần xử lý hôm nay.`
-        : quizzes.length > 0
+      quizzes.length > 0
         ? `Đã sẵn sàng với ${quizzes.length} bộ đề trong thư viện. Chọn lộ trình hoặc nhấn Bắt đầu ngay.`
         : "Khám phá ngay với 3 bộ đề mẫu chuẩn THPT 2026 & TOEIC hoặc tự tạo đề bằng AI.";
   }
 
-  renderSrsMatrix();
   renderStarterAndRecentDecks();
-}
-
-function renderSrsMatrix() {
-  const srs = getSrsStats();
-  const totalBadge = document.getElementById("srsTotalBadge");
-  if (totalBadge) {
-    totalBadge.textContent = `${srs.total} câu đang theo dõi • ${srs.mastered} thuộc lòng`;
-  }
-
-  const maxCount = Math.max(1, ...srs.boxes);
-  for (let i = 0; i < 5; i++) {
-    const count = srs.boxes[i] || 0;
-    const valEl = document.getElementById(`srsBox${i + 1}`);
-    const barEl = document.getElementById(`srsBar${i + 1}`);
-    if (valEl) valEl.textContent = count;
-    if (barEl) {
-      const hPct = count === 0 ? 6 : Math.max(14, Math.round((count / maxCount) * 100));
-      barEl.style.height = `${hPct}%`;
-    }
-  }
 }
 
 function renderStarterAndRecentDecks() {

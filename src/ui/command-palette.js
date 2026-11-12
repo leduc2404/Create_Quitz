@@ -1,6 +1,5 @@
 // Command Palette (Ctrl+K / Cmd+K) — trung tâm điều khiển & tìm kiếm tức thì phong cách Raycast / Linear.
 import { getState, setTheme } from "../core/store.js";
-import { dueEntries } from "../core/srs.js";
 import { importantCount } from "../core/flags.js";
 import { isSoundEnabled, setSoundEnabled } from "./sound.js";
 import { showTab } from "./router.js";
@@ -137,7 +136,6 @@ export function closeCommandPalette() {
 function buildItems(query) {
   const q = query.toLowerCase();
   const quizzes = getState().quizzes || [];
-  const due = dueEntries().length;
   const imp = importantCount();
   const items = [];
 
@@ -166,18 +164,6 @@ function buildItems(query) {
       keywords: "on nhanh 10 cau quick start",
       action: () => hooksRef.onQuick && hooksRef.onQuick(10)
     },
-    ...(due > 0
-      ? [
-          {
-            group: "Ôn tập thông minh",
-            icon: "RotateCw",
-            title: `Ôn câu yếu đến hạn SRS (${due} câu)`,
-            meta: "Spaced Repetition",
-            keywords: "on cau yeu srs due",
-            action: () => hooksRef.onReviewDue && hooksRef.onReviewDue()
-          }
-        ]
-      : []),
     ...(imp > 0
       ? [
           {

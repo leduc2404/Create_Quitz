@@ -30,15 +30,8 @@
           <div class="brand-mark"><i data-icon="Sparkles" data-size="18"></i></div>
           <div class="brand-text">
             <span class="brand-name">Quitz</span>
-            <span class="brand-tag">STUDIO 5.0</span>
           </div>
         </div>
-
-        <button type="button" class="cmd-trigger-btn" data-open-cmd title="Tìm kiếm nhanh &amp; Bảng lệnh (Ctrl + K)">
-          <i data-icon="Search" data-size="15"></i>
-          <span>Tìm đề, lệnh nhanh...</span>
-          <kbd>Ctrl K</kbd>
-        </button>
 
         <nav class="sidebar-nav" aria-label="Menu chính">
           <button class="nav-btn sidebar-link active" data-tab="homeScreen">
@@ -108,12 +101,6 @@
             <span>Quitz</span>
           </div>
           <div class="header-actions">
-            <button type="button" class="header-cmd-btn" data-open-cmd aria-label="Tìm kiếm nhanh (Ctrl+K)"
-              title="Tìm kiếm &amp; Lệnh nhanh (Ctrl+K)">
-              <i data-icon="Search" data-size="17"></i>
-              <span class="header-cmd-label">Tìm nhanh...</span>
-              <kbd>⌘K</kbd>
-            </button>
             <button type="button" class="icon-btn header-theme-btn" id="headerThemeBtn"
               aria-label="Đổi giao diện Sáng/Tối" title="Đổi giao diện Sáng / Tối">
               <i data-icon="Sun" data-size="18"></i>
@@ -132,7 +119,7 @@
             <div class="home-greet">
               <div class="eyebrow-pill"><i data-icon="Sparkles" data-size="13"></i> <span>NEO-EDITORIAL STUDY STUDIO</span></div>
               <h1 id="greetTitle">Sẵn sàng ôn tập?</h1>
-              <p class="muted" id="greetSub">Mỗi ngày một chút, ghi nhớ sâu hơn bằng lặp lại ngắt quãng.</p>
+              <p class="muted" id="greetSub">Mỗi ngày một chút, tiến bộ bền vững qua từng phiên học.</p>
             </div>
             <div class="home-top-badges">
               <button class="chip-btn streak-chip" id="streakBtn" title="Chuỗi ngày ôn tập liên tục">
@@ -204,15 +191,6 @@
                   </div>
                 </button>
 
-                <button class="chip-btn action-tile" id="reviewDueBtn" hidden>
-                  <div class="tile-ic due"><i data-icon="RotateCw" data-size="18"></i></div>
-                  <div class="tile-body">
-                    <strong>Ôn câu yếu đến hạn</strong>
-                    <span>Lặp lại ngắt quãng SRS</span>
-                  </div>
-                  <span class="chip-count" id="duePill">0</span>
-                </button>
-
                 <button class="chip-btn action-tile" id="importantBtn" hidden>
                   <div class="tile-ic star"><i data-icon="Bookmark" data-size="18"></i></div>
                   <div class="tile-body">
@@ -233,45 +211,6 @@
             </div>
 
             <div class="home-side-col">
-              <!-- Ma trận trí nhớ Leitner 5 Hộp (SRS Memory Matrix) -->
-              <div class="bento-panel srs-panel">
-                <div class="panel-head">
-                  <div class="panel-title">
-                    <i data-icon="Brain" data-size="17"></i>
-                    <span>Ma trận trí nhớ SRS</span>
-                  </div>
-                  <span class="panel-badge" id="srsTotalBadge">0 thẻ</span>
-                </div>
-                <p class="panel-desc muted">Hệ thống tự động xếp câu hỏi vào 5 hộp Leitner dựa trên độ chính xác của bạn.</p>
-                <div class="srs-boxes-grid" id="srsBoxesGrid">
-                  <div class="srs-box-col">
-                    <div class="srs-bar-wrap"><div class="srs-bar-fill b1" id="srsBar1"></div></div>
-                    <strong class="srs-box-num" id="srsBox1">0</strong>
-                    <span class="srs-box-lbl">Hộp 1<small>10p</small></span>
-                  </div>
-                  <div class="srs-box-col">
-                    <div class="srs-bar-wrap"><div class="srs-bar-fill b2" id="srsBar2"></div></div>
-                    <strong class="srs-box-num" id="srsBox2">0</strong>
-                    <span class="srs-box-lbl">Hộp 2<small>1 ngày</small></span>
-                  </div>
-                  <div class="srs-box-col">
-                    <div class="srs-bar-wrap"><div class="srs-bar-fill b3" id="srsBar3"></div></div>
-                    <strong class="srs-box-num" id="srsBox3">0</strong>
-                    <span class="srs-box-lbl">Hộp 3<small>3 ngày</small></span>
-                  </div>
-                  <div class="srs-box-col">
-                    <div class="srs-bar-wrap"><div class="srs-bar-fill b4" id="srsBar4"></div></div>
-                    <strong class="srs-box-num" id="srsBox4">0</strong>
-                    <span class="srs-box-lbl">Hộp 4<small>7 ngày</small></span>
-                  </div>
-                  <div class="srs-box-col">
-                    <div class="srs-bar-wrap"><div class="srs-bar-fill b5" id="srsBar5"></div></div>
-                    <strong class="srs-box-num" id="srsBox5">0</strong>
-                    <span class="srs-box-lbl">Hộp 5<small>Thuộc</small></span>
-                  </div>
-                </div>
-              </div>
-
               <!-- Khám phá nhanh / Bộ đề mẫu tích hợp -->
               <div class="bento-panel starter-panel">
                 <div class="panel-head">
@@ -494,9 +433,11 @@
                   <strong id="profileName">Khách</strong>
                   <span class="muted" id="profileEmail">Đăng nhập để đồng bộ bộ đề lên đám mây</span>
                 </div>
-                <button class="primary-btn compact-btn" id="profileAuthBtn">Đăng nhập</button>
-                <button class="ghost-btn compact-btn danger" id="logoutBtn" hidden><i data-icon="LogOut"
-                    data-size="16"></i> Đăng xuất</button>
+                <div class="profile-card-actions">
+                  <button class="primary-btn compact-btn" id="profileAuthBtn">Đăng nhập</button>
+                  <button class="ghost-btn compact-btn danger" id="logoutBtn" hidden><i data-icon="LogOut"
+                      data-size="16"></i> Đăng xuất</button>
+                </div>
               </div>
 
               <!-- Thống kê năng lực tổng quan (EdTech Analytics) -->
@@ -721,7 +662,7 @@
                 <button id="fontIncBtn" class="font-btn" title="Cỡ chữ lớn hơn" aria-label="Tăng cỡ chữ">A+</button>
               </div>
 
-              <div class="tool-cluster">
+              <div class="tool-cluster tool-cluster-primary">
                 <button class="icon-btn" id="flagBtn" aria-label="Gắn cờ phân vân"
                   title="Gắn cờ câu hỏi phân vân (Phím F)">
                   <i data-icon="Flag" data-size="17"></i>
@@ -730,13 +671,16 @@
                   title="Lưu câu quan trọng (Phím B)">
                   <i data-icon="Bookmark" data-size="17"></i>
                 </button>
-                <button class="icon-btn" id="scratchpadToggleBtn" aria-label="Giấy nháp"
-                  title="Giấy nháp điện tử (Phím S)">
-                  <i data-icon="PenTool" data-size="17"></i>
-                </button>
                 <button class="icon-btn" id="paletteToggleBtn" aria-label="Bảng câu hỏi"
                   title="Bảng danh sách câu hỏi (Phím P)">
                   <i data-icon="LayoutGrid" data-size="17"></i>
+                </button>
+              </div>
+
+              <div class="tool-cluster tool-cluster-secondary" id="quizToolsSecondary">
+                <button class="icon-btn" id="scratchpadToggleBtn" aria-label="Giấy nháp"
+                  title="Giấy nháp điện tử (Phím S)">
+                  <i data-icon="PenTool" data-size="17"></i>
                 </button>
                 <button class="icon-btn" id="quizSoundBtn" aria-label="Bật/tắt âm thanh"
                   title="Âm thanh hiệu ứng (Phím M)">
@@ -751,6 +695,11 @@
                   <i data-icon="Maximize2" data-size="17"></i>
                 </button>
               </div>
+
+              <button type="button" class="icon-btn quiz-tools-more" id="quizToolsMoreBtn"
+                aria-label="Thêm công cụ" aria-expanded="false">
+                <i data-icon="MoreHorizontal" data-size="17"></i>
+              </button>
             </div>
           </div>
 
